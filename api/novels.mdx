@@ -5,7 +5,11 @@ description: "API endpoints for managing novels and the library"
 
 The Novels API lets you browse the novel library, search for titles, inspect metadata, and remove novels. All endpoints are under `/api/novel` and require authentication.
 
-## GET /api/novel/novels
+<Note>
+  The list endpoint path is `/api/novels` (the `/novel` prefix + `s` suffix). Single-resource endpoints use `/api/novel/{id}`.
+</Note>
+
+## GET /api/novels
 
 Return a paginated list of novels in the library.
 
@@ -56,7 +60,7 @@ Return a paginated list of novels in the library.
 </ResponseField>
 
 ```bash
-curl -s "http://localhost:8080/api/novel/novels?search=overgeared&limit=5" \
+curl -s "http://localhost:8080/api/novels?search=overgeared&limit=5" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

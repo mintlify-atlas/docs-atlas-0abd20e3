@@ -73,12 +73,14 @@ Authentication uses the same credentials as the web UI. Endpoints are organized 
 
 | Path prefix | Description |
 |---|---|
-| `/api/novels` | Novel library management |
-| `/api/chapters` | Chapter data |
-| `/api/volumes` | Volume groupings |
-| `/api/jobs` | Background job queue |
+| `/api/auth` | Authentication tokens and user management |
+| `/api/novels` | Novel library management (list/search/delete) |
+| `/api/novel/{id}/chapters` | Chapter listing for a novel |
+| `/api/novel/{id}/volumes` | Volume listing for a novel |
+| `/api/chapter/{id}` | Individual chapter data and content |
+| `/api/jobs` | Background crawl job queue |
+| `/api/job/create/*` | Create crawl, chapter, and artifact jobs |
 | `/api/artifacts` | Generated e-book files |
-| `/api/auth` | Authentication tokens |
 
 ## Port configuration
 

@@ -5,6 +5,10 @@ description: "API endpoints for downloading generated e-book files"
 
 Artifacts are the generated e-book output files produced after a `make-artifacts` job completes. All endpoints are under `/api/artifact` and require authentication.
 
+<Note>
+  The list endpoint path is `/api/artifacts` (the `/artifact` prefix + `s` suffix). Single-resource endpoints use `/api/artifact/{id}`.
+</Note>
+
 <Tip>
   To generate new artifacts, use [`POST /api/job/create/make-artifacts`](/api/jobs#post-apijobcreatemake-artifacts).
   To see all artifacts for a specific novel, use [`GET /api/novel/{novel_id}/artifacts`](/api/novels#get-apinovelnovel_idartifacts).
@@ -37,7 +41,7 @@ The following format strings are used across the Artifacts and Jobs APIs:
 
 ---
 
-## GET /api/artifact/artifacts
+## GET /api/artifacts
 
 Return a paginated list of artifacts. Authentication is required.
 
@@ -89,7 +93,7 @@ Return a paginated list of artifacts. Authentication is required.
 </ResponseField>
 
 ```bash
-curl -s "http://localhost:8080/api/artifact/artifacts?novel_id=abc123" \
+curl -s "http://localhost:8080/api/artifacts?novel_id=abc123" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

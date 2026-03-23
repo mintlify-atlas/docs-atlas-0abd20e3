@@ -5,6 +5,10 @@ description: "API endpoints for managing crawl jobs"
 
 The Jobs API lets you create, monitor, cancel, and delete background crawl jobs. All endpoints are under `/api/job` and require authentication.
 
+<Note>
+  The list endpoint path is `/api/jobs` (the `/job` prefix + `s` suffix). Single-resource and action endpoints use `/api/job/{id}`.
+</Note>
+
 Jobs are the primary way to trigger long-running operations such as fetching novel metadata, downloading chapter content, or generating e-book artifacts.
 
 ## Job types
@@ -44,7 +48,7 @@ Jobs are the primary way to trigger long-running operations such as fetching nov
 
 ---
 
-## GET /api/job/jobs
+## GET /api/jobs
 
 Return a paginated list of jobs visible to the authenticated user.
 
@@ -114,7 +118,7 @@ Return a paginated list of jobs visible to the authenticated user.
 </ResponseField>
 
 ```bash
-curl -s "http://localhost:8080/api/job/jobs?status=1" \
+curl -s "http://localhost:8080/api/jobs?status=1" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

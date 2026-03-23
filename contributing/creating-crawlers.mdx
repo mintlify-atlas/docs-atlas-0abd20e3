@@ -252,14 +252,14 @@ For English sites, use a letter subfolder based on the site's domain name (e.g. 
     Find the cover image element and return its URL. Use `self.absolute_url()` to handle relative paths.
 
     ```python
-    def parse_cover(self, soup: PageSoup) -> str:
+    def parse_cover(self, soup: PageSoup) -> Optional[str]:
         img = soup.select_one("img.cover")  # adjust selector
         if img and img.get("src"):
             return self.absolute_url(img["src"])
-        return ""
+        return None
     ```
 
-    Return `""` if the site has no cover image.
+    Return `None` if the site has no cover image.
   </Step>
 
   <Step title="Implement parse_chapter_list">
