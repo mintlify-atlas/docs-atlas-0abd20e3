@@ -1,0 +1,156 @@
+---
+title: "Chapters API"
+description: "API endpoints for accessing chapter content"
+---
+
+The Chapters API provides access to individual chapter metadata, content, and images. All endpoints are under `/api/chapter` and require authentication.
+
+<Tip>
+  To get a paginated list of chapters for a novel, use `GET /api/novel/{novel_id}/chapters` on the [Novels API](/api/novels).
+</Tip>
+
+## GET /api/chapter/{chapter_id}
+
+Return the metadata for a single chapter.
+
+**Path parameters**
+
+<ParamField path="chapter_id" type="string" required>
+  The chapter's unique ID.
+</ParamField>
+
+**Response** — a `Chapter` object.
+
+<ResponseField name="id" type="string">Unique chapter ID.</ResponseField>
+<ResponseField name="novel_id" type="string">Parent novel ID.</ResponseField>
+<ResponseField name="volume_id" type="string | null">Parent volume ID, if the chapter belongs to a volume.</ResponseField>
+<ResponseField name="serial" type="integer">Chapter number within the novel (1-indexed).</ResponseField>
+<ResponseField name="url" type="string">Full URL of the chapter's content page on the source site.</ResponseField>
+<ResponseField name="title" type="string">Chapter title.</ResponseField>
+<ResponseField name="is_done" type="boolean">Whether the chapter content has been crawled.</ResponseField>
+<ResponseField name="content_file" type="string">Relative path to the compressed chapter content file.</ResponseField>
+<ResponseField name="is_available" type="boolean">Whether the chapter content file is available locally.</ResponseField>
+<ResponseField name="created_at" type="integer">Creation time (UNIX ms).</ResponseField>
+<ResponseField name="updated_at" type="integer">Last update time (UNIX ms).</ResponseField>
+
+```bash
+curl -s http://localhost:8080/api/chapter/ch001 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```json
+{
+  "id": "ch001",
+  "novel_id": "abc123",
+  "volume_id": "vol001",
+  "serial": 1,
+  "url": "https://readnovelfull.com/overgeared/chapter-1.html",
+  "title": "Chapter 1",
+  "is_done": true,
+  "content_file": "novels/abc123/chapters/000001.zst",
+  "is_available": true,
+  "created_at": 1700000000000,
+  "updated_at": 1700001000000
+}
+```
+
+## GET /api/chapter/{chapter_id}/fetch
+
+Create (or retrieve an existing) crawl job to download the content for this chapter. If a job for this chapter already exists, the existing job is returned instead of creating a duplicate.
+
+**Path parameters**
+
+<ParamField path="chapter_id" type="string" required>
+  The chapter's unique ID.
+</ParamField>
+
+**Response** — a `Job` object. See the [Jobs API](/api/jobs) for field descriptions.
+
+```bash
+curl -s http://localhost:8080/api/chapter/ch001/fetch \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## GET /api/chapter/{chapter_id}/images
+
+List the images referenced in a chapter.
+
+**Path parameters**
+
+<ParamField path="chapter_id" type="string" required>
+  The chapter's unique ID.
+</ParamField>
+
+**Query parameters**
+
+<ParamField query="available_only" type="boolean" default="false">
+  When `true`, only return images that have already been downloaded locally.
+</ParamField>
+
+**Response** — array of `ChapterImage` objects.
+
+<ResponseField name="id" type="string">Unique image ID.</ResponseField>
+<ResponseField name="novel_id" type="string">Parent novel ID.</ResponseField>
+<ResponseField name="chapter_id" type="string">Parent chapter ID.</ResponseField>
+<ResponseField name="url" type="string">Original remote image URL.</ResponseField>
+<ResponseField name="is_done" type="boolean">Whether the image has been downloaded.</ResponseField>
+<ResponseField name="image_file" type="string">Relative path to the local image file.</ResponseField>
+<ResponseField name="is_available" type="boolean">Whether the local image file exists.</ResponseField>
+<ResponseField name="created_at" type="integer">Creation time (UNIX ms).</ResponseField>
+<ResponseField name="updated_at" type="integer">Last update time (UNIX ms).</ResponseField>
+
+```bash
+curl -s "http://localhost:8080/api/chapter/ch001/images?available_only=true" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## GET /api/chapter/{chapter_id}/read
+
+Return the chapter content prepared for reading, including navigation links to the previous and next chapters.
+
+<Note>
+  The chapter content must have been crawled first (`is_done: true`). If the content is not yet available, trigger a fetch job via `GET /api/chapter/{chapter_id}/fetch`.
+</Note>
+
+**Path parameters**
+
+<ParamField path="chapter_id" type="string" required>
+  The chapter's unique ID.
+</ParamField>
+
+**Response** — a `ReadChapterResponse` object.
+
+<ResponseField name="novel" type="object">
+  The parent novel object. See [Novels API](/api/novels) for field descriptions.
+</ResponseField>
+
+<ResponseField name="chapter" type="object">
+  The chapter metadata object (same fields as `GET /api/chapter/{chapter_id}`).
+</ResponseField>
+
+<ResponseField name="content" type="string | null">
+  The chapter body as an HTML string. `null` if the content has not been fetched yet.
+</ResponseField>
+
+<ResponseField name="next_id" type="string | null">
+  The ID of the next chapter, or `null` if this is the last chapter.
+</ResponseField>
+
+<ResponseField name="previous_id" type="string | null">
+  The ID of the previous chapter, or `null` if this is the first chapter.
+</ResponseField>
+
+```bash
+curl -s http://localhost:8080/api/chapter/ch001/read \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```json
+{
+  "novel": { "id": "abc123", "title": "Overgeared", "..." : "..." },
+  "chapter": { "id": "ch001", "serial": 1, "title": "Chapter 1", "..." : "..." },
+  "content": "<p>Grid was the top-ranked player...</p>",
+  "next_id": "ch002",
+  "previous_id": null
+}
+```

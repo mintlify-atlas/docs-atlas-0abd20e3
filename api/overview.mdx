@@ -1,0 +1,146 @@
+---
+title: "REST API overview"
+description: "Overview of the Lightnovel Crawler REST API"
+---
+
+The Lightnovel Crawler REST API is a [FastAPI](https://fastapi.tiangolo.com/)-based HTTP API that exposes the full functionality of the crawler: browsing novels, triggering crawl jobs, managing artifacts, and more.
+
+## Base URL
+
+```
+http://localhost:8080/api
+```
+
+All endpoint paths documented here are relative to this base URL.
+
+## Starting the server
+
+```bash
+lncrawl server
+```
+
+The server starts on port `8080` by default.
+
+## Authentication
+
+The API uses **JWT bearer tokens**. Every protected endpoint requires an `Authorization` header:
+
+```
+Authorization: Bearer <token>
+```
+
+The server also accepts **HTTP Basic Auth** (username/password) on every endpoint that accepts bearer tokens.
+
+### Default credentials
+
+| Field    | Value   |
+|----------|---------|
+| Email    | `admin` |
+| Password | `admin` |
+
+<Warning>
+  Change the default password before exposing the server to any network.
+</Warning>
+
+### Obtaining a token
+
+Send a `POST /api/auth/login` request with your credentials. The response contains a `token` field you use in all subsequent requests.
+
+```bash
+curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin", "password": "admin"}'
+```
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "a1b2c3d4",
+    "email": "admin",
+    "name": null,
+    "role": "admin",
+    "tier": 0,
+    "is_active": true,
+    "is_verified": false
+  }
+}
+```
+
+Use the token in subsequent requests:
+
+```bash
+curl -s http://localhost:8080/api/novel/novels \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+## Error responses
+
+All errors follow a consistent JSON shape:
+
+```json
+{
+  "detail": "A human-readable error message"
+}
+```
+
+Validation errors (HTTP `422`) include a more detailed breakdown:
+
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "email"],
+      "msg": "field required",
+      "type": "value_error.missing"
+    }
+  ]
+}
+```
+
+## Common HTTP status codes
+
+| Code  | Meaning                                                              |
+|-------|----------------------------------------------------------------------|
+| `200` | Success                                                              |
+| `400` | Bad request — invalid parameters or business rule violation          |
+| `401` | Unauthorized — missing or invalid credentials                        |
+| `403` | Forbidden — authenticated but insufficient permissions               |
+| `404` | Not found — the requested resource does not exist                    |
+| `422` | Unprocessable entity — request body failed schema validation         |
+| `500` | Internal server error                                                |
+
+## Pagination
+
+List endpoints return a `Paginated` wrapper object:
+
+```json
+{
+  "total": 120,
+  "offset": 0,
+  "limit": 20,
+  "items": []
+}
+```
+
+Use `offset` and `limit` query parameters to page through results. The maximum `limit` is `100`.
+
+## API sections
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/auth">
+    Login, signup, token management, and password reset.
+  </Card>
+  <Card title="Novels" icon="book" href="/api/novels">
+    Browse and manage the novel library.
+  </Card>
+  <Card title="Chapters" icon="file-lines" href="/api/chapters">
+    Fetch chapter metadata and read chapter content.
+  </Card>
+  <Card title="Jobs" icon="bolt" href="/api/jobs">
+    Create and monitor crawl jobs.
+  </Card>
+  <Card title="Artifacts" icon="download" href="/api/artifacts">
+    List and download generated e-book files.
+  </Card>
+</CardGroup>

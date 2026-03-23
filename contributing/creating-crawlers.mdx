@@ -1,0 +1,532 @@
+---
+title: "Creating crawlers"
+description: "Step-by-step guide to adding a new source crawler"
+---
+
+A **source crawler** is a small Python file that tells Lightnovel Crawler how to read a specific novel website. It answers two questions:
+
+1. **What's on the novel page?** — title, author, cover, list of chapters.
+2. **What's inside each chapter?** — the story text, cleaned of ads and navigation.
+
+Once you add a crawler, users can download novels from that site through the CLI or the web UI.
+
+## Prerequisites
+
+- Python 3.9+
+- The project set up locally (see [Development setup](/contributing/development-setup))
+- Basic familiarity with HTML and CSS selectors — you'll use selectors like `div.chapter-content` to target elements
+
+## Architecture overview
+
+Crawlers live in the `sources/` directory, organized by language. Each crawler is a single `.py` file containing one class that inherits from a template base class. The template handles HTTP requests, concurrency, and output building — you only implement the methods that extract data from the page HTML.
+
+The crawler registry auto-discovers all Python files in `sources/` on startup. A crawler is matched to a URL when the URL starts with one of the values in the class's `base_url` list.
+
+## Choose a template
+
+Pick the template that matches your site's structure. Start with `GeneralSoupTemplate` for most sites and only move to a more specific template if you need its extra features.
+
+<Tabs>
+  <Tab title="GeneralSoupTemplate (recommended)">
+    **File:** `sources/_examples/_01_general_soup.py`
+
+    The default choice for most sites. Requires four methods and handles everything else.
+
+    ```python
+    # -*- coding: utf-8 -*-
+    import logging
+    from typing import Generator, Union
+
+    from lncrawl.core import PageSoup
+    from lncrawl.models import Chapter, Volume
+    from lncrawl.templates.soup.general import GeneralSoupTemplate
+
+    logger = logging.getLogger(__name__)
+
+
+    class MySiteCrawler(GeneralSoupTemplate):
+        base_url = ["https://mysite.com/", "https://www.mysite.com/"]
+
+        def parse_title(self, soup: PageSoup) -> str:
+            raise NotImplementedError()
+
+        def parse_cover(self, soup: PageSoup) -> str:
+            return ""
+
+        def parse_chapter_list(
+            self, soup: PageSoup
+        ) -> Generator[Union[Chapter, Volume], None, None]:
+            yield from []
+
+        def select_chapter_body(self, soup: PageSoup) -> PageSoup:
+            raise NotImplementedError()
+    ```
+
+    Use this template when the site renders HTML server-side and has a straightforward chapter list.
+  </Tab>
+  <Tab title="SearchableSoupTemplate">
+    **File:** `sources/_examples/_02_searchable_soup.py`
+
+    Extends `GeneralSoupTemplate` to support searching by title. Add this when the site has a working search box.
+
+    Two extra required methods:
+
+    ```python
+    from lncrawl.models import SearchResult
+    from lncrawl.templates.soup.searchable import SearchableSoupTemplate
+
+
+    class MySiteCrawler(SearchableSoupTemplate):
+        base_url = ["https://mysite.com/"]
+
+        def select_search_items(
+            self, query: str
+        ) -> Generator[PageSoup, None, None]:
+            # Fetch the search results page and yield anchor tags
+            soup = self.get_soup(f"{self.home_url}search?q={query}")
+            yield from soup.select(".search-results a")
+
+        def parse_search_item(self, tag: PageSoup) -> SearchResult:
+            return SearchResult(
+                title=tag.get_text(strip=True),
+                url=self.absolute_url(tag["href"]),
+            )
+
+        # ...plus the four GeneralSoupTemplate methods
+    ```
+  </Tab>
+  <Tab title="With volumes">
+    **File:** `sources/_examples/_05_with_volume_soup.py`
+
+    Use `ChapterWithVolumeSoupTemplate` when the novel page displays explicit volume blocks, each containing its own chapter list.
+
+    ```python
+    from lncrawl.models import Chapter, Volume
+    from lncrawl.templates.soup.with_volume import ChapterWithVolumeSoupTemplate
+
+
+    class MySiteCrawler(ChapterWithVolumeSoupTemplate):
+        base_url = ["https://mysite.com/"]
+
+        def select_volume_tags(
+            self, soup: PageSoup
+        ) -> Generator[PageSoup, None, None]:
+            yield from soup.select("#toc .vol-item")
+
+        def parse_volume_item(self, tag: PageSoup, id: int) -> Volume:
+            return Volume(id=id, title=tag.get_text(strip=True))
+
+        def select_chapter_tags(
+            self, tag: PageSoup, vol: Volume, soup: PageSoup
+        ) -> Generator[PageSoup, None, None]:
+            yield from tag.select(".chapter-item")
+
+        def parse_chapter_item(
+            self, tag: PageSoup, id: int, vol: Volume
+        ) -> Chapter:
+            return Chapter(
+                id=id,
+                volume=vol.id,
+                title=tag.get_text(strip=True),
+                url=self.absolute_url(tag["href"]),
+            )
+
+        def select_chapter_body(self, soup: PageSoup) -> PageSoup:
+            return soup.select_one(".chapter-content")
+    ```
+
+    Also see `_07_optional_volume_soup.py` for sites where volumes are sometimes present.
+  </Tab>
+  <Tab title="Browser-based">
+    **Files:** `sources/_examples/_09_basic_browser.py` through `_17_searchable_optional_volume_browser.py`
+
+    Use browser templates when the site loads content via JavaScript. The browser template renders the page with a headless browser before parsing.
+
+    ```python
+    from lncrawl.models.chapter import Chapter
+    from lncrawl.templates.browser.basic import BasicBrowserTemplate
+
+
+    class MySiteCrawler(BasicBrowserTemplate):
+        base_url = ["https://mysite.com/"]
+
+        def read_novel_info_in_soup(self) -> None:
+            # Try with plain HTTP first; raise ScraperNotSupported() to fall back
+            pass
+
+        def read_novel_info_in_browser(self) -> None:
+            # Uses self.browser (headless browser)
+            # Access parsed HTML via self.browser.soup
+            pass
+
+        def download_chapter_body_in_browser(self, chapter: Chapter) -> str:
+            self.visit(chapter["url"])
+            soup = self.browser.soup
+            tag = soup.select_one(".chapter-content")
+            return self.cleaner.extract_contents(tag)
+    ```
+
+    Browser templates are slower than soup-based ones. Only use them when the site actively requires JavaScript execution.
+  </Tab>
+  <Tab title="Base Crawler">
+    **File:** `sources/_examples/_00_basic.py`
+
+    Inherit directly from `Crawler` when you need full control. Requires two methods and no template scaffolding.
+
+    ```python
+    from lncrawl.core import Crawler
+    from lncrawl.models import Chapter
+
+
+    class MySiteCrawler(Crawler):
+        base_url = ["https://mysite.com/"]
+
+        def read_novel_info(self) -> None:
+            soup = self.get_soup(self.novel_url)
+            self.novel_title = soup.select_one("h1").get_text(strip=True)
+            self.novel_cover = self.absolute_url(
+                soup.select_one("img.cover")["src"]
+            )
+            # Populate self.volumes and self.chapters
+
+        def download_chapter_body(self, chapter: Chapter) -> str:
+            soup = self.get_soup(chapter["url"])
+            tag = soup.select_one(".chapter-content")
+            return self.cleaner.extract_contents(tag)
+    ```
+
+    This style is fully supported but the `GeneralSoupTemplate` style is recommended for new crawlers — smaller methods, less boilerplate, same result.
+  </Tab>
+</Tabs>
+
+## File placement
+
+Crawlers are grouped by the site's language. Place your file in the matching directory:
+
+| Site language | Folder | Example path |
+|---|---|---|
+| English | `sources/en/` then by first letter | `sources/en/m/mysite.py` |
+| Chinese | `sources/zh/` | `sources/zh/mysite.py` |
+| Japanese | `sources/ja/` | `sources/ja/mysite.py` |
+| Multiple languages | `sources/multi/` | `sources/multi/mysite.py` |
+
+For English sites, use a letter subfolder based on the site's domain name (e.g. "mynovelsite.com" → `sources/en/m/`). Name the file after the site, such as `mynovelsite.py`. Avoid generic names like `crawler.py`.
+
+## Step-by-step: build a crawler
+
+<Steps>
+  <Step title="Copy the example file">
+    Copy the appropriate example into the right `sources/{lang}/` folder:
+
+    ```bash
+    cp sources/_examples/_01_general_soup.py sources/en/m/mysite.py
+    ```
+
+    For English sites, use the letter subfolder matching your domain's first letter.
+  </Step>
+
+  <Step title="Set base_url and rename the class">
+    Open your new file and update the class name and `base_url`:
+
+    ```python
+    class MySiteCrawler(GeneralSoupTemplate):
+        base_url = ["https://mysite.com/", "https://www.mysite.com/"]
+    ```
+
+    `base_url` is a list of URL prefixes. When a user pastes a novel URL, the app finds your crawler by checking if the URL starts with one of these values.
+  </Step>
+
+  <Step title="Implement parse_title">
+    Open the novel page in your browser, right-click the title, and select **Inspect**. Find the CSS selector that uniquely identifies the title element.
+
+    ```python
+    def parse_title(self, soup: PageSoup) -> str:
+        tag = soup.select_one("h1.novel-title")  # adjust selector to match site
+        return tag.get_text(strip=True) if tag else ""
+    ```
+
+    The `soup` parameter is the parsed HTML of the novel's detail page.
+  </Step>
+
+  <Step title="Implement parse_cover">
+    Find the cover image element and return its URL. Use `self.absolute_url()` to handle relative paths.
+
+    ```python
+    def parse_cover(self, soup: PageSoup) -> str:
+        img = soup.select_one("img.cover")  # adjust selector
+        if img and img.get("src"):
+            return self.absolute_url(img["src"])
+        return ""
+    ```
+
+    Return `""` if the site has no cover image.
+  </Step>
+
+  <Step title="Implement parse_chapter_list">
+    Yield `Volume` and `Chapter` objects in order. The template appends them to `self.volumes` and `self.chapters`.
+
+    **Flat chapter list (no explicit volumes):**
+
+    ```python
+    from lncrawl.models import Chapter, Volume
+
+    def parse_chapter_list(
+        self, soup: PageSoup
+    ) -> Generator[Union[Chapter, Volume], None, None]:
+        yield Volume(id=1, title="Volume 1")
+
+        for idx, a in enumerate(soup.select("ul.chapters a"), 1):
+            yield Chapter(
+                id=idx,
+                title=a.get_text(strip=True),
+                url=self.absolute_url(a["href"]),
+                volume=1,
+            )
+    ```
+
+    **With volume headings:**
+
+    ```python
+    def parse_chapter_list(
+        self, soup: PageSoup
+    ) -> Generator[Union[Chapter, Volume], None, None]:
+        chap_id = 1
+        for vol_id, vol_tag in enumerate(soup.select(".volume-block"), 1):
+            yield Volume(id=vol_id, title=vol_tag.select_one(".vol-title").get_text(strip=True))
+            for a in vol_tag.select("a.chapter-link"):
+                yield Chapter(
+                    id=chap_id,
+                    title=a.get_text(strip=True),
+                    url=self.absolute_url(a["href"]),
+                    volume=vol_id,
+                )
+                chap_id += 1
+    ```
+
+    Always use `self.absolute_url()` on chapter URLs — some sites use relative paths.
+  </Step>
+
+  <Step title="Implement select_chapter_body">
+    The template fetches each chapter page and calls this method with its parsed HTML. Return the single tag that wraps the story text.
+
+    ```python
+    def select_chapter_body(self, soup: PageSoup) -> PageSoup:
+        return soup.select_one("div.chapter-content")  # adjust selector
+    ```
+
+    The template extracts and cleans the content automatically. Return `None` if not found.
+  </Step>
+
+  <Step title="Test with a real novel URL">
+    Run a quick download test from the project root. `--first 3` downloads only the first 3 chapters; `-f json` outputs as JSON:
+
+    ```bash
+    uv run python -m lncrawl -s "https://mysite.com/novel/example" --first 3 -f json
+    ```
+
+    If you see errors about selectors or "element not found", your CSS selectors don't match the site — use the browser's Inspect tool to find the correct class names.
+  </Step>
+
+  <Step title="Verify the crawler is registered">
+    Confirm your file appears in the source list:
+
+    ```bash
+    uv run python -m lncrawl sources list | grep mysite
+    ```
+
+    If nothing appears, check that the file is in the right `sources/` folder and that the class inherits from `Crawler` or a template.
+  </Step>
+</Steps>
+
+## Required method signatures
+
+These are the four methods every `GeneralSoupTemplate` crawler must implement:
+
+```python
+def parse_title(self, soup: PageSoup) -> str:
+    """Return the novel title from the novel detail page."""
+    ...
+
+def parse_cover(self, soup: PageSoup) -> str:
+    """Return the cover image URL, or '' if none.
+    Use self.absolute_url() for relative paths.
+    """
+    ...
+
+def parse_chapter_list(
+    self, soup: PageSoup
+) -> Generator[Union[Chapter, Volume], None, None]:
+    """Yield Volume and Chapter objects in order.
+    The template appends them to self.volumes and self.chapters.
+    """
+    ...
+
+def select_chapter_body(self, soup: PageSoup) -> PageSoup:
+    """Return the Tag containing the chapter text.
+    The template cleans and extracts it.
+    Return None if not found.
+    """
+    ...
+```
+
+## Optional methods
+
+Override these in your class when needed. The template provides working defaults for all of them.
+
+| Method | Purpose |
+|---|---|
+| `get_novel_soup(self)` | Return the BeautifulSoup for the novel page. Override if you need a different URL or POST request. |
+| `parse_authors(self, soup)` | Yield author name strings. Default: yields nothing. |
+| `parse_genres(self, soup)` | Yield genre or tag strings. Default: yields nothing. |
+| `parse_summary(self, soup)` | Return the novel synopsis string. Default: `""`. |
+| `initialize(self)` | One-time setup — configure cleaner rules, set custom headers. |
+| `login(self, username_or_email, password_or_token)` | Log in before scraping, for sites that require authentication. |
+
+**Example — parse_authors:**
+
+```python
+def parse_authors(self, soup: PageSoup) -> Generator[str, None, None]:
+    tag = soup.find("strong", string="Author:")
+    if tag and tag.next_sibling:
+        yield tag.next_sibling.get_text(strip=True)
+    # For multiple authors:
+    # for a in soup.select(".author a"):
+    #     yield a.get_text(strip=True)
+```
+
+**Example — initialize with custom cleaner rules:**
+
+```python
+def initialize(self) -> None:
+    self.cleaner.bad_css.update(["div.advertisement", "div.social-share"])
+    self.cleaner.bad_tags.update(["script", "style"])
+```
+
+## Available helper methods
+
+These are inherited from the base template and available inside any method:
+
+### HTTP and parsing
+
+| Method | Description |
+|---|---|
+| `self.get_soup(url)` | GET request, returns `PageSoup` |
+| `self.post_soup(url, data)` | POST request, returns `PageSoup` |
+| `self.get_json(url)` | GET request, returns parsed JSON |
+| `self.post_json(url, data)` | POST request, returns parsed JSON |
+| `self.submit_form(url, data)` | Submit form data |
+
+### URLs
+
+| Method | Description |
+|---|---|
+| `self.absolute_url(path)` | Convert a relative path like `/chapter/1` to a full URL |
+| `self.novel_url` | The novel page URL the user provided |
+| `self.home_url` | The first value in `base_url` |
+
+### Content cleaning
+
+```python
+# Remove specific CSS selectors before extraction
+self.cleaner.bad_css.update(["div.ads", "span.watermark"])
+
+# Remove specific tags
+self.cleaner.bad_tags.update(["script", "style"])
+
+# Extract clean HTML from a tag
+html = self.cleaner.extract_contents(soup_element)
+```
+
+## Using ChatGPT to generate a crawler
+
+The CLI includes a command that uses ChatGPT to generate a crawler from a novel URL:
+
+```bash
+lncrawl sources create
+```
+
+This is a good starting point, but the generated code will need review and testing before it is ready to submit.
+
+## Known engine templates
+
+If the site runs on a widely-used novel platform, you may be able to inherit from an existing engine template and only override `base_url`:
+
+- `lncrawl.templates.madara` — Madara WordPress theme
+- `lncrawl.templates.novelfull` — NovelFull-style sites
+- `lncrawl.templates.novelpub` — NovelPub-style sites
+
+Check existing crawlers in `sources/` that use these templates for reference.
+
+## Best practices
+
+- **Handle missing elements** — not every novel has a cover or author. Always use `if tag:` before accessing attributes.
+- **Log useful info** — `logger.info("Found %d chapters", len(self.chapters))` makes debugging much easier.
+- **Use `self.absolute_url()`** — for all chapter URLs and the cover image, to ensure they resolve correctly from any context.
+- **Test edge cases** — try a novel with many chapters, one with special characters in the title, and one with no cover.
+- **Clean the chapter content** — configure `self.cleaner` to strip ads, navigation links, and scripts so the exported ebook looks clean.
+- **Respect the site** — don't send too many requests at once; the base app already limits concurrency.
+
+### Common mistakes
+
+<Warning>
+- **Wrong selectors** — the site's HTML may use different class names from what you expect. Always inspect the live page in your browser.
+- **Relative URLs** — always use `self.absolute_url(link["href"])` for chapter URLs and cover images.
+- **Unimplemented required methods** — `parse_title`, `parse_cover`, `parse_chapter_list`, and `select_chapter_body` must all return real data, or the app will do nothing.
+</Warning>
+
+## Complete example
+
+A full working crawler using `GeneralSoupTemplate`:
+
+```python
+# -*- coding: utf-8 -*-
+import logging
+from typing import Generator, Union
+
+from lncrawl.core import PageSoup
+from lncrawl.models import Chapter, Volume
+from lncrawl.templates.soup.general import GeneralSoupTemplate
+
+logger = logging.getLogger(__name__)
+
+
+class ExampleCrawler(GeneralSoupTemplate):
+    base_url = ["https://example-novel-site.com/"]
+
+    def initialize(self) -> None:
+        self.cleaner.bad_css.update(["div.advertisement", "div.social-share"])
+
+    def parse_title(self, soup: PageSoup) -> str:
+        tag = soup.select_one("h1.novel-title")
+        return tag.get_text(strip=True) if tag else ""
+
+    def parse_cover(self, soup: PageSoup) -> str:
+        img = soup.select_one("img.novel-cover")
+        if img and img.get("src"):
+            return self.absolute_url(img["src"])
+        return ""
+
+    def parse_authors(self, soup: PageSoup) -> Generator[str, None, None]:
+        author = soup.select_one("span.author-name")
+        if author:
+            yield author.get_text(strip=True)
+
+    def parse_chapter_list(
+        self, soup: PageSoup
+    ) -> Generator[Union[Chapter, Volume], None, None]:
+        yield Volume(id=1, title="Volume 1")
+        links = soup.select("ul.chapter-list a")
+        for idx, a in enumerate(links, 1):
+            yield Chapter(
+                id=idx,
+                title=a.get_text(strip=True),
+                url=self.absolute_url(a["href"]),
+                volume=1,
+            )
+        logger.info("Found %d chapters", len(links))
+
+    def select_chapter_body(self, soup: PageSoup) -> PageSoup:
+        return soup.select_one("div.chapter-content")
+```
+
+Once everything works, open a pull request to the main repository.

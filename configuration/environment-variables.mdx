@@ -1,0 +1,193 @@
+---
+title: "Environment variables"
+description: "Environment variables for configuring Lightnovel Crawler"
+---
+
+Lightnovel Crawler reads environment variables at startup. They take precedence over or supplement the values in `config.json`. The application loads a `.env` file automatically via [python-dotenv](https://pypi.org/project/python-dotenv/) if one is present in the working directory.
+
+## Core variables
+
+<ParamField path="LNCRAWL_DATA_PATH" type="string">
+  Override the default application data directory. This directory is used for `config.json`, the SQLite database, downloaded sources, and output files.
+
+  Default: platform-specific app dir (`~/.config/LNCrawl/` on Linux, `~/Library/Application Support/LNCrawl/` on macOS, `%APPDATA%\LNCrawl\` on Windows).
+
+  Example: `LNCRAWL_DATA_PATH=/srv/lncrawl`
+</ParamField>
+
+<ParamField path="LNCRAWL_CONFIG" type="string">
+  Path to an alternative config file. Overrides the default `<APP_DIR>/config.json` location.
+
+  Default: `<LNCRAWL_DATA_PATH>/config.json`
+
+  Example: `LNCRAWL_CONFIG=/etc/lncrawl/config.json`
+</ParamField>
+
+<ParamField path="LNCRAWL_LOG_LEVEL" type="integer">
+  Numeric log verbosity level. Mapped to standard Python logging levels.
+
+  | Value | Level |
+  | ----- | ----- |
+  | `0` | NOTSET (silent) |
+  | `1` | WARN |
+  | `2` | INFO |
+  | `3` | DEBUG |
+
+  Default: `0`
+
+  Example: `LNCRAWL_LOG_LEVEL=2`
+</ParamField>
+
+## Database
+
+<ParamField path="DATABASE_URL" type="string">
+  SQLAlchemy database connection URL. Overrides the `database.url` config key.
+
+  Supported databases:
+
+  ```text
+  sqlite:////home/user/sqlite.db
+  postgresql+psycopg://pguser:pgpass@postgres:5432/lncrawl
+  mysql+pymysql://user:password@mysql:3306/lncrawl
+  ```
+
+  Default: `sqlite:///<APP_DIR>/sqlite.db`
+
+  Example: `DATABASE_URL=postgresql+psycopg://pguser:pgpass@postgres:5432/lncrawl`
+</ParamField>
+
+## Crawler and browser
+
+<ParamField path="SELENIUM_GRID" type="string">
+  URL of a remote Selenium Grid hub. Overrides the `crawler.selenium_grid` config key. When set, the crawler sends browser automation requests to the remote grid instead of launching a local Chrome instance.
+
+  Default: `""` (use local browser)
+
+  Example: `SELENIUM_GRID=http://selenium-hub:4444`
+</ParamField>
+
+<ParamField path="CHROME_WIDTH" type="integer">
+  Width in pixels for the local Chrome browser window when running in non-headless mode.
+
+  Default: 3/4 of the screen width, minimum `640`
+
+  Example: `CHROME_WIDTH=1280`
+</ParamField>
+
+<ParamField path="CHROME_HEIGHT" type="integer">
+  Height in pixels for the local Chrome browser window when running in non-headless mode.
+
+  Default: 3/4 of the screen height, minimum `480`
+
+  Example: `CHROME_HEIGHT=720`
+</ParamField>
+
+<ParamField path="debug_mode" type="string">
+  Enable debug mode for the local and remote web drivers. Any non-empty value activates it.
+
+  Default: unset
+
+  Example: `debug_mode=1`
+</ParamField>
+
+## File uploads
+
+<ParamField path="CLOUD_DRIVE" type="string">
+  Cloud storage backend used for uploading output files.
+
+  | Value | Backend |
+  | ----- | ------- |
+  | `ANONFILES` | AnonFiles (default) |
+  | `GOFILE` | GoFile |
+  | `GOOGLE_DRIVE` | Google Drive |
+
+  Default: `ANONFILES`
+
+  Example: `CLOUD_DRIVE=GOOGLE_DRIVE`
+</ParamField>
+
+<ParamField path="GOOGLE_DRIVE_CREDENTIAL_FILE" type="string">
+  Path to the Google service account credentials JSON file. Required when `CLOUD_DRIVE=GOOGLE_DRIVE`.
+
+  Default: unset
+
+  Example: `GOOGLE_DRIVE_CREDENTIAL_FILE=/secrets/google-credentials.json`
+</ParamField>
+
+<ParamField path="GOOGLE_DRIVE_FOLDER_ID" type="string">
+  Google Drive folder ID to upload files into. Required when `CLOUD_DRIVE=GOOGLE_DRIVE`.
+
+  Default: unset
+
+  Example: `GOOGLE_DRIVE_FOLDER_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs`
+</ParamField>
+
+## CI and terminal
+
+<ParamField path="CI" type="string">
+  When set, disables terminal colors and rich formatting (`TERM=dumb`, `NO_COLOR=1`). Standard behavior in most CI environments.
+
+  Default: unset
+
+  Example: `CI=true`
+</ParamField>
+
+## Setting environment variables
+
+<Tabs>
+  <Tab title="Linux / macOS">
+    **Session (current terminal only):**
+
+    ```bash
+    export LNCRAWL_DATA_PATH=/srv/lncrawl
+    lncrawl server
+    ```
+
+    **Persistent (add to your shell profile):**
+
+    ```bash
+    echo 'export LNCRAWL_DATA_PATH=/srv/lncrawl' >> ~/.bashrc
+    source ~/.bashrc
+    ```
+
+    **Single command:**
+
+    ```bash
+    LNCRAWL_DATA_PATH=/srv/lncrawl lncrawl server
+    ```
+  </Tab>
+  <Tab title="Windows">
+    **Session (current terminal only):**
+
+    ```powershell
+    $env:LNCRAWL_DATA_PATH = "C:\lncrawl"
+    lncrawl server
+    ```
+
+    **Persistent (system environment):**
+
+    ```powershell
+    [System.Environment]::SetEnvironmentVariable("LNCRAWL_DATA_PATH", "C:\lncrawl", "User")
+    ```
+  </Tab>
+</Tabs>
+
+## Using a .env file
+
+Lightnovel Crawler automatically loads a `.env` file from the working directory using [python-dotenv](https://pypi.org/project/python-dotenv/). Create a `.env` file next to where you run `lncrawl`:
+
+```bash
+# .env
+LNCRAWL_DATA_PATH=/srv/lncrawl
+DATABASE_URL=postgresql+psycopg://pguser:pgpass@postgres:5432/lncrawl
+SELENIUM_GRID=http://selenium-hub:4444
+LNCRAWL_LOG_LEVEL=1
+```
+
+<Warning>
+  Do not commit `.env` files containing secrets (passwords, API keys) to version control. Add `.env` to your `.gitignore`.
+</Warning>
+
+<Tip>
+  When using Docker Compose, pass environment variables through the `environment` or `env_file` keys in your `docker-compose.yml` instead of a `.env` file.
+</Tip>

@@ -1,0 +1,169 @@
+---
+title: "Artifacts API"
+description: "API endpoints for downloading generated e-book files"
+---
+
+Artifacts are the generated e-book output files produced after a `make-artifacts` job completes. All endpoints are under `/api/artifact` and require authentication.
+
+<Tip>
+  To generate new artifacts, use [`POST /api/job/create/make-artifacts`](/api/jobs#post-apijobcreatemake-artifacts).
+  To see all artifacts for a specific novel, use [`GET /api/novel/{novel_id}/artifacts`](/api/novels#get-apinovelnovel_idartifacts).
+</Tip>
+
+## Output formats
+
+The following format strings are used across the Artifacts and Jobs APIs:
+
+| Format  | Description              |
+|---------|--------------------------|
+| `epub`  | EPUB e-book (native)     |
+| `json`  | JSON export              |
+| `txt`   | Plain text               |
+| `pdf`   | PDF document             |
+| `mobi`  | Mobipocket (Kindle)      |
+| `docx`  | Microsoft Word           |
+| `rtf`   | Rich Text Format         |
+| `fb2`   | FictionBook 2            |
+| `azw3`  | Kindle Format 8          |
+| `lit`   | Microsoft LIT            |
+| `lrf`   | Sony LRF                 |
+| `pdb`   | Palm Database            |
+| `rb`    | Rocket Book              |
+| `tcr`   | Psion/Epoc               |
+
+<Note>
+  Formats other than `epub` and `json` require [Calibre](https://calibre-ebook.com/) to be installed on the server. The available formats for your account depend on your user tier.
+</Note>
+
+---
+
+## GET /api/artifact/artifacts
+
+Return a paginated list of artifacts. Authentication is required.
+
+**Query parameters**
+
+<ParamField query="offset" type="integer" default="0">
+  Number of records to skip.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Maximum records to return. Cannot exceed `100`.
+</ParamField>
+
+<ParamField query="novel_id" type="string">
+  Filter by novel ID.
+</ParamField>
+
+<ParamField query="job_id" type="string">
+  Filter by the job that generated the artifact.
+</ParamField>
+
+<ParamField query="user_id" type="string">
+  Filter by the user who triggered artifact generation.
+</ParamField>
+
+<ParamField query="format" type="string">
+  Filter by output format (e.g. `epub`, `mobi`).
+</ParamField>
+
+**Response** — `Paginated[Artifact]`
+
+<ResponseField name="total" type="integer">Total matching records.</ResponseField>
+<ResponseField name="offset" type="integer">Current offset.</ResponseField>
+<ResponseField name="limit" type="integer">Current limit.</ResponseField>
+<ResponseField name="items" type="Artifact[]">
+  <Expandable title="Artifact fields">
+    <ResponseField name="id" type="string">Unique artifact ID.</ResponseField>
+    <ResponseField name="novel_id" type="string">ID of the parent novel.</ResponseField>
+    <ResponseField name="job_id" type="string | null">ID of the job that produced this artifact.</ResponseField>
+    <ResponseField name="user_id" type="string | null">ID of the user who triggered generation.</ResponseField>
+    <ResponseField name="format" type="string">Output format string (e.g. `epub`).</ResponseField>
+    <ResponseField name="file_name" type="string">Output file name.</ResponseField>
+    <ResponseField name="file_size" type="integer">File size in bytes.</ResponseField>
+    <ResponseField name="output_file" type="string">Relative path to the artifact file on the server.</ResponseField>
+    <ResponseField name="is_available" type="boolean">Whether the artifact file is accessible on the server.</ResponseField>
+    <ResponseField name="created_at" type="integer">Creation time (UNIX ms).</ResponseField>
+    <ResponseField name="updated_at" type="integer">Last update time (UNIX ms).</ResponseField>
+  </Expandable>
+</ResponseField>
+
+```bash
+curl -s "http://localhost:8080/api/artifact/artifacts?novel_id=abc123" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```json
+{
+  "total": 2,
+  "offset": 0,
+  "limit": 20,
+  "items": [
+    {
+      "id": "art001",
+      "novel_id": "abc123",
+      "job_id": "job042",
+      "user_id": "a1b2c3",
+      "format": "epub",
+      "file_name": "Overgeared.epub",
+      "file_size": 4823091,
+      "output_file": "novels/abc123/artifacts/Overgeared.epub",
+      "is_available": true,
+      "created_at": 1700002000000,
+      "updated_at": 1700002000000
+    }
+  ]
+}
+```
+
+## GET /api/artifact/enabled-formats
+
+Return the list of output formats that are enabled for the currently authenticated user. The available formats depend on the user's tier.
+
+**Response** — array of format strings.
+
+```bash
+curl -s http://localhost:8080/api/artifact/enabled-formats \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```json
+["epub", "json", "txt"]
+```
+
+## GET /api/artifact/{artifact_id}
+
+Return a single artifact record by its ID.
+
+**Path parameters**
+
+<ParamField path="artifact_id" type="string" required>
+  The artifact's unique ID.
+</ParamField>
+
+**Response** — an `Artifact` object (same fields as items in the list response).
+
+```bash
+curl -s http://localhost:8080/api/artifact/art001 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Downloading artifact files
+
+Artifact files are served from the `/static` path using the `output_file` field as the path component:
+
+```bash
+# Fetch the artifact record first
+OUTPUT_FILE=$(curl -s http://localhost:8080/api/artifact/art001 \
+  -H "Authorization: Bearer $TOKEN" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['output_file'])")
+
+# Download the file
+curl -s -O "http://localhost:8080/static/$OUTPUT_FILE"
+```
+
+<Note>
+  Static file serving requires authentication. Include the bearer token or use HTTP Basic Auth when downloading.
+</Note>

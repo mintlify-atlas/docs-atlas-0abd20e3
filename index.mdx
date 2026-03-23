@@ -1,97 +1,95 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Lightnovel Crawler"
+description: "Download and convert light novels from 360+ online sources into EPUB, MOBI, PDF, and more."
+mode: "custom"
 ---
 
-## Setting up
+<div style={{background: "linear-gradient(135deg, #048e7f 0%, #1b4d2e 100%)", borderRadius: "12px", padding: "60px 40px", marginBottom: "40px", textAlign: "center"}}>
+  <img src="https://media.brand.dev/9f25d91a-fd42-43be-82d3-b73ba3d841cb.svg" alt="Lightnovel Crawler" style={{height: "80px", marginBottom: "24px"}} />
+  <h1 style={{color: "#ffffff", fontSize: "2.5rem", fontWeight: "700", margin: "0 0 16px 0", fontFamily: "Inter, sans-serif"}}>Lightnovel Crawler</h1>
+  <p style={{color: "#d0d7d6", fontSize: "1.2rem", margin: "0 0 32px 0", maxWidth: "600px", marginLeft: "auto", marginRight: "auto"}}>
+    Download and convert light novels from 360+ online sources into EPUB, MOBI, PDF, and more — via CLI, web UI, or Docker.
+  </p>
+  <div style={{display: "flex", gap: "16px", justifyContent: "center", flexWrap: "wrap"}}>
+    <a href="/installation" style={{background: "#008080", color: "#ffffff", padding: "12px 28px", borderRadius: "4px", textDecoration: "none", fontWeight: "600", fontSize: "1rem"}}>Get Started</a>
+    <a href="/quickstart" style={{background: "rgba(255,255,255,0.15)", color: "#ffffff", padding: "12px 28px", borderRadius: "4px", textDecoration: "none", fontWeight: "600", fontSize: "1rem"}}>Quickstart</a>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install via pip, standalone binary, or Docker. Supports Windows, macOS, and Linux.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Download your first novel in under 2 minutes with a single command.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="CLI Reference" icon="terminal" href="/usage/cli">
+    Explore all commands: `crawl`, `search`, `server`, `sources`, `config`, and more.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Web Server" icon="globe" href="/usage/web-server">
+    Launch a browser-based UI for managing downloads and your library.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Why Lightnovel Crawler?
 
-Everything you need to create world-class documentation.
+<CardGroup cols={3}>
+  <Card title="360+ Sources" icon="database">
+    Supports over 360 light novel websites across English, Chinese, Japanese, Korean, and more.
+  </Card>
+  <Card title="Multiple Formats" icon="file-export">
+    Export to EPUB, MOBI, PDF, DOCX, RTF, FB2, AZW3, JSON, TXT, and HTML.
+  </Card>
+  <Card title="Fast Downloads" icon="bolt">
+    Concurrent chapter downloading with configurable worker threads for maximum speed.
+  </Card>
+  <Card title="Cloudflare Bypass" icon="shield">
+    Built-in Cloudflare bypass and browser automation for JS-heavy sites.
+  </Card>
+  <Card title="Web UI & API" icon="window">
+    Full REST API and browser-based management UI when running as a server.
+  </Card>
+  <Card title="Bot Integrations" icon="robot">
+    Discord and Telegram bot support for downloading novels via chat commands.
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Quick install
 
-## Need inspiration?
+<CodeGroup>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+```bash pip
+pip install -U lightnovel-crawler
+lncrawl -h
+```
+
+```bash Docker
+docker pull ghcr.io/lncrawl/lightnovel-crawler
+docker run -v ~/.lncrawl:/data --rm -it ghcr.io/lncrawl/lightnovel-crawler
+```
+
+```bash From source
+git clone https://github.com/lncrawl/lightnovel-crawler
+cd lightnovel-crawler
+make setup && make install
+make start
+```
+
+</CodeGroup>
+
+## Explore the docs
+
+<CardGroup cols={2}>
+  <Card title="Supported sources" icon="list" href="/sources/overview">
+    Browse the full list of 360+ supported novel websites.
+  </Card>
+  <Card title="Output formats" icon="file" href="/usage/output-formats">
+    Learn about all supported e-book formats and Calibre integration.
+  </Card>
+  <Card title="Adding a new source" icon="plus" href="/contributing/creating-crawlers">
+    Contribute a new crawler using the template system.
+  </Card>
+  <Card title="REST API" icon="code" href="/api/overview">
+    Integrate with the web server API for programmatic access.
+  </Card>
+</CardGroup>

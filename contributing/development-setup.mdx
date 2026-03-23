@@ -1,0 +1,195 @@
+---
+title: "Development setup"
+description: "Set up a local development environment for Lightnovel Crawler"
+---
+
+## Prerequisites
+
+- **Python 3.9 or higher**
+- **Git**
+- **[uv](https://docs.astral.sh/uv/)** — the package manager used by this project
+
+## Setup
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/lncrawl/lightnovel-crawler
+    cd lightnovel-crawler
+    ```
+  </Step>
+
+  <Step title="Install uv">
+    If you don't have uv installed, the Makefile will install it for you during the next step. To install it manually:
+
+    ```bash
+    # macOS and Linux
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    # Windows (PowerShell)
+    powershell -NoProfile -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    ```
+
+    See the [uv installation docs](https://docs.astral.sh/uv/getting-started/installation/) for more options.
+  </Step>
+
+  <Step title="Install dependencies">
+    Run the install target, which syncs submodules and installs all Python dependencies including dev tools:
+
+    ```bash
+    make install
+    ```
+
+    This runs `uv sync --extra dev` under the hood. You can also run that command directly if you prefer.
+  </Step>
+
+  <Step title="Run the server">
+    Start the backend server:
+
+    ```bash
+    make start
+    # or
+    uv run python -m lncrawl
+    ```
+
+    The server starts at `http://localhost:8080` by default.
+  </Step>
+
+  <Step title="Enable auto-reload (optional)">
+    For active development, run in watch mode. The server restarts automatically when you change a Python file:
+
+    ```bash
+    make watch
+    ```
+  </Step>
+</Steps>
+
+## Makefile command reference
+
+All common tasks are available as Makefile targets. Run them from the repository root.
+
+| Command | Description |
+|---|---|
+| `make setup` | Sync submodules and install uv if not present |
+| `make install` | Install all Python dependencies (`uv sync --extra dev`) |
+| `make upgrade` | Upgrade all dependencies to their latest allowed versions |
+| `make start` | Start the backend server |
+| `make watch` | Start the backend server with auto-reload on file changes |
+| `make lint` | Run black, isort, and flake8 checks |
+| `make build` | Full build: version check, install, wheel, and exe |
+| `make build-wheel` | Build a Python wheel (`.whl`) only |
+| `make build-exe` | Build a standalone executable via PyInstaller |
+| `make add-dep PKG` | Add a runtime dependency (e.g. `make add-dep httpx`) |
+| `make add-dev PKG` | Add a dev-only dependency (e.g. `make add-dev black`) |
+| `make rm-dep PKG` | Remove a runtime dependency |
+| `make rm-dev PKG` | Remove a dev-only dependency |
+| `make docker-build` | Build the Docker application image |
+| `make docker-up` | Start the stack with Docker Compose (background) |
+| `make docker-down` | Stop the Docker Compose stack |
+| `make docker-logs` | Stream logs from running containers |
+| `make clean` | Remove `.venv`, `build`, `dist`, and cache directories |
+| `make pull` | Git pull with rebase and update submodules |
+| `make version` | Print the current version from `lncrawl/VERSION` |
+
+## Linting
+
+Run the full lint suite before opening a pull request:
+
+```bash
+make lint
+```
+
+This runs three checks in sequence:
+
+1. **black** — code formatting
+2. **isort** — import ordering
+3. **flake8** — style and error checking (configured in `.flake8`)
+
+If black or isort report formatting issues, run them directly to auto-fix:
+
+```bash
+uv run black .
+uv run isort .
+```
+
+## Building
+
+<CodeGroup>
+
+```bash Full build
+# Runs version check, install, wheel, and exe
+make build
+```
+
+```bash Wheel only
+# Produces a .whl file in dist/
+make build-wheel
+```
+
+```bash Standalone executable
+# Produces a single binary via PyInstaller
+make build-exe
+```
+
+</CodeGroup>
+
+## Docker development
+
+You can also develop and test using Docker:
+
+```bash
+# Build the base image (Calibre + dependencies) then the app image
+make docker-build
+
+# Start the stack in the background
+make docker-up
+
+# Stop the stack
+make docker-down
+
+# Stream container logs
+make docker-logs
+```
+
+Docker Compose configuration is at `scripts/local-compose.yml`.
+
+## Managing dependencies
+
+Add and remove dependencies with uv through the Makefile targets. This keeps `pyproject.toml` and `uv.lock` in sync automatically.
+
+```bash
+# Add a runtime dependency
+make add-dep httpx
+
+# Add a dev-only dependency
+make add-dev black
+
+# Remove a runtime dependency
+make rm-dep httpx
+
+# Remove a dev-only dependency
+make rm-dev black
+```
+
+## Project structure
+
+Key directories and what they contain:
+
+| Path | Description |
+|---|---|
+| `lncrawl/` | Main application package |
+| `lncrawl/core/` | Core base classes: `Crawler`, `Scraper`, `TaskManager` |
+| `lncrawl/templates/` | Crawler templates: `soup/`, `browser/`, `madara.py`, etc. |
+| `lncrawl/models/` | Data models: `Chapter`, `Volume`, `Novel`, `SearchResult` |
+| `lncrawl/server/` | FastAPI server and REST API endpoints |
+| `lncrawl/services/` | Application services: binder, sources registry, jobs |
+| `lncrawl/dao/` | Database access objects (SQLAlchemy/SQLModel) |
+| `sources/` | All source crawlers, organized by language |
+| `sources/_examples/` | Template examples for new crawlers |
+| `sources/en/` | English-language crawlers, split by first letter |
+| `sources/multi/` | Multi-language crawlers |
+| `scripts/` | Build and Docker scripts |
+
+<Note>
+All core services (config, db, http, sources, binder, jobs) are accessed through the `AppContext` singleton (`ctx`). See `lncrawl/context.py` for details.
+</Note>

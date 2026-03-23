@@ -1,0 +1,81 @@
+---
+title: "Output formats"
+description: "All supported e-book output formats and Calibre integration"
+---
+
+Lightnovel Crawler can produce e-books in a range of formats. Some formats are generated natively; others require [Calibre](https://calibre-ebook.com/download) to be installed.
+
+<Tip>
+  EPUB is the recommended primary format. It is generated natively (no Calibre needed), preserves the most structure, and is supported by virtually every e-reader. All Calibre-converted formats are derived from the EPUB output.
+</Tip>
+
+## Format comparison
+
+| Format | Extension | Requires Calibre | Notes |
+|---|---|---|---|
+| EPUB | `.epub` | No | Native. Recommended format. |
+| Plain text | `.txt.zip` | No | Native. One `.txt` file per chapter, bundled as a ZIP. |
+| JSON | `.json.zip` | No | Native. Raw chapter data as JSON, bundled as a ZIP. |
+| PDF | `.pdf` | Yes | Letter-sized pages with page numbers and headers. |
+| MOBI | `.mobi` | Yes | Legacy Kindle format. |
+| DOCX | `.docx` | Yes | Microsoft Word format. |
+| RTF | `.rtf` | Yes | Rich Text Format. |
+| FB2 | `.fb2` | Yes | FictionBook 2 format. |
+| AZW3 | `.azw3` | Yes | Modern Kindle format. |
+| LIT | `.lit` | Yes | Microsoft Reader format (legacy). |
+| LRF | `.lrf` | Yes | Sony Reader format (legacy). |
+| PDB | `.pdb` | Yes | Palm Database format (legacy). |
+| RB | `.rb` | Yes | Rocket Book format (legacy). |
+| TCR | `.tcr` | Yes | Psion/Epoc format (legacy). |
+
+## Calibre
+
+All formats except EPUB, TXT, and JSON require Calibre's `ebook-convert` tool.
+
+**Install Calibre:** https://calibre-ebook.com/download
+
+Without Calibre, running `lncrawl` will only make EPUB, TXT, and JSON available. Calibre-only formats will be hidden from the interactive format picker and skipped if requested via `-f`.
+
+### macOS PATH setup
+
+On macOS, Calibre's command-line tools are not automatically added to `PATH`. Before starting `lncrawl`, run:
+
+```bash
+export PATH="$PATH:/Applications/calibre.app/Contents/MacOS"
+```
+
+Add this line to your shell profile (`~/.zshrc` or `~/.bash_profile`) to make it permanent. If you installed Calibre in a non-default location, replace `/Applications/` with the correct path.
+
+## Specifying formats
+
+Use the `-f` / `--format` flag with the `crawl` command to choose output formats.
+
+```bash
+# Single format
+lncrawl crawl --all -f epub https://novelfull.com/my-novel.html
+
+# Multiple formats in one run
+lncrawl crawl --all -f epub -f mobi -f pdf https://novelfull.com/my-novel.html
+```
+
+The flag can be repeated as many times as needed. Valid values match the extension names shown in the table above: `epub`, `txt`, `json`, `pdf`, `mobi`, `docx`, `rtf`, `fb2`, `azw3`, `lit`, `lrf`, `pdb`, `rb`, `tcr`.
+
+<Note>
+  When Calibre-converted formats are requested, lncrawl always generates the EPUB first and converts from it — even if `epub` was not explicitly listed in `-f`.
+</Note>
+
+## Where output files are saved
+
+Files are written to the output directory configured in `LNCRAWL_DATA_PATH` (defaults to the current user's data directory). Within that directory:
+
+```
+<data>/
+  novels/
+    <novel-title>/
+      artifacts/
+        MyNovel.epub
+        MyNovel.mobi
+        MyNovel.pdf
+```
+
+In interactive mode, the artifacts folder is opened automatically after a successful crawl. In `--noin` mode, the path is printed to stdout.

@@ -1,0 +1,249 @@
+---
+title: "Authentication"
+description: "Authenticate with the Lightnovel Crawler REST API"
+---
+
+All endpoints under `/api/auth` handle user identity. Most do not require an existing session, but a few require a valid bearer token (indicated below).
+
+<Note>
+  The default credentials are **email: `admin`** and **password: `admin`**. Change them after first login.
+</Note>
+
+## POST /api/auth/login
+
+Exchange credentials for a JWT bearer token.
+
+**Request body**
+
+<ParamField body="email" type="string" required>
+  The user's email address (or username for the default admin account).
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's password.
+</ParamField>
+
+**Response**
+
+<ResponseField name="token" type="string">
+  JWT bearer token. Pass this as `Authorization: Bearer <token>` on protected endpoints.
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  <Expandable title="User fields">
+    <ResponseField name="id" type="string">Unique user ID.</ResponseField>
+    <ResponseField name="email" type="string">User email address.</ResponseField>
+    <ResponseField name="name" type="string | null">Display name.</ResponseField>
+    <ResponseField name="role" type="string">`user` or `admin`.</ResponseField>
+    <ResponseField name="tier" type="integer">`0` = Basic, `1` = Premium, `2` = VIP.</ResponseField>
+    <ResponseField name="is_active" type="boolean">Whether the account is active.</ResponseField>
+    <ResponseField name="is_verified" type="boolean">Whether the email has been verified.</ResponseField>
+    <ResponseField name="created_at" type="integer">Account creation time (UNIX ms).</ResponseField>
+    <ResponseField name="updated_at" type="integer">Last update time (UNIX ms).</ResponseField>
+  </Expandable>
+</ResponseField>
+
+```bash
+curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin", "password": "admin"}'
+```
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "a1b2c3d4e5f6",
+    "email": "admin",
+    "name": null,
+    "role": "admin",
+    "tier": 0,
+    "is_active": true,
+    "is_verified": false,
+    "created_at": 1700000000000,
+    "updated_at": 1700000000000
+  }
+}
+```
+
+## POST /api/auth/signup
+
+Register a new user account. A `referrer` token is required (obtained from an existing user or admin).
+
+**Request body**
+
+<ParamField body="referrer" type="string" required>
+  Referrer token provided by an existing user.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  New user's email address.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  New user's password.
+</ParamField>
+
+<ParamField body="name" type="string">
+  Optional display name.
+</ParamField>
+
+**Response** — same shape as `/login`: a `LoginResponse` with `token` and `user`.
+
+## GET /api/auth/me
+
+Return the currently authenticated user's details.
+
+<Note>Requires a valid bearer token.</Note>
+
+```bash
+curl -s http://localhost:8080/api/auth/me \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response** — a `User` object (same fields as the `user` object in the login response).
+
+## PUT /api/auth/me/name
+
+Update the display name of the current user.
+
+<Note>Requires a valid bearer token.</Note>
+
+**Request body**
+
+<ParamField body="name" type="string" required>
+  New display name.
+</ParamField>
+
+**Response** — `true` on success.
+
+## PUT /api/auth/me/password
+
+Change the current user's password.
+
+<Note>Requires a valid bearer token.</Note>
+
+**Request body**
+
+<ParamField body="old_password" type="string" required>
+  Current password.
+</ParamField>
+
+<ParamField body="new_password" type="string" required>
+  New password.
+</ParamField>
+
+**Response** — `true` on success.
+
+## POST /api/auth/send-password-reset-link
+
+Send a password-reset link to the given email address.
+
+**Request body**
+
+<ParamField body="email" type="string" required>
+  Email address of the account to reset.
+</ParamField>
+
+**Response** — `true` on success.
+
+## POST /api/auth/reset-password-with-token
+
+Reset a password using the token received in the reset email. Pass the reset token as a bearer token in the `Authorization` header.
+
+<Note>Requires the password-reset bearer token from the reset email.</Note>
+
+**Request body**
+
+<ParamField body="password" type="string">
+  The new password.
+</ParamField>
+
+**Response** — `true` on success.
+
+## POST /api/auth/me/send-otp
+
+Send a one-time password (OTP) to the current user's email for verification.
+
+<Note>Requires a valid bearer token.</Note>
+
+**Response**
+
+<ResponseField name="token" type="string">
+  An OTP session token to be passed to `/verify-otp`.
+</ResponseField>
+
+## POST /api/auth/verify-otp
+
+Verify an OTP code and mark the user's email as verified. Submit as `multipart/form-data`.
+
+**Form fields**
+
+<ParamField body="otp" type="string" required>
+  The one-time password received by email.
+</ParamField>
+
+<ParamField body="token" type="string" required>
+  The OTP session token returned by `/me/send-otp`.
+</ParamField>
+
+**Response** — `true` on success.
+
+## POST /api/auth/me/create-token
+
+Generate a long-lived user API token (distinct from the JWT session token).
+
+<Note>Requires a valid bearer token.</Note>
+
+**Response**
+
+<ResponseField name="token" type="string">
+  The new API token string.
+</ResponseField>
+
+## GET /api/auth/verify-token
+
+Check whether a given user API token is valid and the account is active.
+
+**Query parameters**
+
+<ParamField query="token" type="string" required>
+  The user token to verify.
+</ParamField>
+
+**Response** — `true` if the token is valid and the account is active, `false` otherwise.
+
+## POST /api/auth/me/tokens
+
+List all API tokens belonging to the current user.
+
+<Note>Requires a valid bearer token.</Note>
+
+**Response** — array of `UserToken` objects.
+
+<ResponseField name="token" type="string">The 10-character token string.</ResponseField>
+<ResponseField name="user_id" type="string">ID of the owning user.</ResponseField>
+<ResponseField name="expires_at" type="integer">Expiry time (UNIX ms).</ResponseField>
+
+---
+
+## Using the token
+
+Include the JWT from `/login` in every protected request:
+
+```bash
+# Store the token
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin", "password": "admin"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+# Use the token
+curl -s http://localhost:8080/api/novel/novels \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+<Tip>
+  You can also use HTTP Basic Auth on any endpoint that accepts a bearer token:
+  `curl -u admin:admin http://localhost:8080/api/novel/novels`
+</Tip>

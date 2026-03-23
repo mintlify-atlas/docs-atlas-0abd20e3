@@ -1,0 +1,67 @@
+---
+title: "Contributing"
+description: "How to contribute to Lightnovel Crawler"
+---
+
+There are several ways to contribute to Lightnovel Crawler, whether you're comfortable with Python or just want to help improve docs.
+
+## Ways to contribute
+
+- **Add a new source crawler** — write a small Python file that teaches the app how to read a novel website. This is the most common and impactful contribution.
+- **Fix bugs** — browse the [open issues](https://github.com/lncrawl/lightnovel-crawler/issues) and pick one to fix.
+- **Improve documentation** — fix typos, clarify steps, or add examples.
+- **Request a new source** — if you want a site supported but can't write the crawler yourself, [open a new issue](https://github.com/lncrawl/lightnovel-crawler/issues/new/choose) to request it.
+
+## Quick start for development
+
+```bash
+git clone https://github.com/lncrawl/lightnovel-crawler.git
+cd lightnovel-crawler
+make setup && make install
+make start
+```
+
+This clones the repo, installs dependencies via [uv](https://docs.astral.sh/uv/), and starts the server. See [Development setup](/contributing/development-setup) for the full walkthrough.
+
+## Code style
+
+The project uses **black** for formatting and **flake8** for linting. Run both before opening a pull request:
+
+```bash
+make lint
+```
+
+This runs `black --check`, `isort --check`, and `flake8` in sequence. Fix any reported issues before submitting.
+
+<Tip>
+Install [black](https://black.readthedocs.io/) in your editor to auto-format on save and avoid lint failures.
+</Tip>
+
+## PR workflow
+
+1. Fork the repository on GitHub.
+2. Create a branch for your change: `git checkout -b feat/my-crawler`.
+3. Make your changes and run `make lint` to verify code style.
+4. Test your change: `uv run python -m lncrawl -s "URL" --first 3 -f`.
+5. Open a pull request against the `master` branch and describe what you changed and why.
+
+<Note>
+For new source crawlers, include the novel URL you tested with in the PR description so reviewers can verify it works.
+</Note>
+
+## Community resources
+
+- [GitHub Discussions](https://github.com/lncrawl/lightnovel-crawler/discussions) — ask questions, share ideas, get help
+- [Open Issues](https://github.com/lncrawl/lightnovel-crawler/issues) — bug reports and feature requests
+- [DeepWiki](https://deepwiki.com/lncrawl/lightnovel-crawler) — AI-generated architecture docs
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Creating crawlers" icon="spider" href="/contributing/creating-crawlers">
+    Step-by-step guide to adding a new source crawler for a novel website.
+  </Card>
+  <Card title="Development setup" icon="terminal" href="/contributing/development-setup">
+    Set up a local development environment with all required tools.
+  </Card>
+</CardGroup>

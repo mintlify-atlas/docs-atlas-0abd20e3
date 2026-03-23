@@ -1,0 +1,357 @@
+---
+title: "Jobs API"
+description: "API endpoints for managing crawl jobs"
+---
+
+The Jobs API lets you create, monitor, cancel, and delete background crawl jobs. All endpoints are under `/api/job` and require authentication.
+
+Jobs are the primary way to trigger long-running operations such as fetching novel metadata, downloading chapter content, or generating e-book artifacts.
+
+## Job types
+
+| Value | Description |
+|-------|-------------|
+| `0`   | Fetch a single novel (`NOVEL`) |
+| `1`   | Fetch multiple novels in a batch (`NOVEL_BATCH`) |
+| `5`   | Full novel fetch including all content (`FULL_NOVEL`) |
+| `6`   | Full novel fetch batch (`FULL_NOVEL_BATCH`) |
+| `10`  | Fetch a single chapter (`CHAPTER`) |
+| `11`  | Fetch chapters in a batch (`CHAPTER_BATCH`) |
+| `20`  | Fetch a single volume (`VOLUME`) |
+| `21`  | Fetch volumes in a batch (`VOLUME_BATCH`) |
+| `30`  | Fetch a single image (`IMAGE`) |
+| `31`  | Fetch images in a batch (`IMAGE_BATCH`) |
+| `40`  | Generate a single artifact (`ARTIFACT`) |
+| `41`  | Generate artifacts in a batch (`ARTIFACT_BATCH`) |
+
+## Job statuses
+
+| Value | Description |
+|-------|-------------|
+| `0`   | `PENDING` — queued, not yet started |
+| `1`   | `RUNNING` — currently executing |
+| `2`   | `SUCCESS` — completed successfully |
+| `3`   | `FAILED` — completed with an error |
+| `4`   | `CANCELED` — stopped by a user or admin |
+
+## Job priorities
+
+| Value | Description |
+|-------|-------------|
+| `0`   | `LOW` |
+| `1`   | `NORMAL` |
+| `2`   | `HIGH` |
+
+---
+
+## GET /api/job/jobs
+
+Return a paginated list of jobs visible to the authenticated user.
+
+**Query parameters**
+
+<ParamField query="offset" type="integer" default="0">
+  Number of records to skip.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Maximum records to return. Cannot exceed `100`.
+</ParamField>
+
+<ParamField query="type" type="integer">
+  Filter by job type (see table above).
+</ParamField>
+
+<ParamField query="status" type="integer">
+  Filter by job status.
+</ParamField>
+
+<ParamField query="priority" type="integer">
+  Filter by job priority.
+</ParamField>
+
+<ParamField query="user_id" type="string">
+  Filter by the user who created the job.
+</ParamField>
+
+<ParamField query="parent_job_id" type="string">
+  Filter by parent job ID (for child jobs in a batch).
+</ParamField>
+
+<ParamField query="is_done" type="boolean">
+  Filter by completion state (`true` = finished, `false` = in progress).
+</ParamField>
+
+**Response** — `Paginated[Job]`
+
+<ResponseField name="total" type="integer">Total matching records.</ResponseField>
+<ResponseField name="offset" type="integer">Current offset.</ResponseField>
+<ResponseField name="limit" type="integer">Current limit.</ResponseField>
+<ResponseField name="items" type="Job[]">
+  <Expandable title="Job fields">
+    <ResponseField name="id" type="string">Unique job ID.</ResponseField>
+    <ResponseField name="user_id" type="string">ID of the user who created the job.</ResponseField>
+    <ResponseField name="parent_job_id" type="string | null">ID of the parent batch job, if any.</ResponseField>
+    <ResponseField name="depends_on" type="string | null">ID of a prerequisite job that must complete first.</ResponseField>
+    <ResponseField name="type" type="integer">Job type (see table above).</ResponseField>
+    <ResponseField name="priority" type="integer">Job priority.</ResponseField>
+    <ResponseField name="status" type="integer">Current job status.</ResponseField>
+    <ResponseField name="is_done" type="boolean">Whether the job has completed (any terminal state).</ResponseField>
+    <ResponseField name="is_running" type="boolean">Computed — `true` when `status` is `RUNNING`.</ResponseField>
+    <ResponseField name="is_pending" type="boolean">Computed — `true` when `status` is `PENDING`.</ResponseField>
+    <ResponseField name="error" type="string | null">Error message if the job failed.</ResponseField>
+    <ResponseField name="done" type="integer">Number of completed items within this job.</ResponseField>
+    <ResponseField name="failed" type="integer">Number of failed items within this job.</ResponseField>
+    <ResponseField name="total" type="integer">Total items to process.</ResponseField>
+    <ResponseField name="progress" type="integer">Completion percentage (0–100).</ResponseField>
+    <ResponseField name="job_title" type="string">Human-readable title derived from the job type and extra data.</ResponseField>
+    <ResponseField name="started_at" type="integer | null">Job start time (UNIX ms).</ResponseField>
+    <ResponseField name="finished_at" type="integer | null">Job finish time (UNIX ms).</ResponseField>
+    <ResponseField name="created_at" type="integer">Creation time (UNIX ms).</ResponseField>
+    <ResponseField name="updated_at" type="integer">Last update time (UNIX ms).</ResponseField>
+    <ResponseField name="extra" type="object">Additional job-specific metadata.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+```bash
+curl -s "http://localhost:8080/api/job/jobs?status=1" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## GET /api/job/{job_id}
+
+Return details for a single job. Use this endpoint to poll job progress.
+
+**Path parameters**
+
+<ParamField path="job_id" type="string" required>
+  The job's unique ID.
+</ParamField>
+
+**Response** — a `Job` object (same fields as the list response).
+
+```bash
+curl -s http://localhost:8080/api/job/job001 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```json
+{
+  "id": "job001",
+  "user_id": "a1b2c3",
+  "parent_job_id": null,
+  "depends_on": null,
+  "type": 10,
+  "priority": 0,
+  "status": 1,
+  "is_done": false,
+  "is_running": true,
+  "is_pending": false,
+  "error": null,
+  "done": 0,
+  "failed": 0,
+  "total": 1,
+  "progress": 0,
+  "job_title": "Overgeared · Chapter 42",
+  "started_at": 1700001000000,
+  "finished_at": null,
+  "created_at": 1700000900000,
+  "updated_at": 1700001000000,
+  "extra": {}
+}
+```
+
+## POST /api/job/{job_id}/cancel
+
+Cancel a running or pending job.
+
+**Path parameters**
+
+<ParamField path="job_id" type="string" required>
+  The job's unique ID.
+</ParamField>
+
+**Response** — `true` on success.
+
+```bash
+curl -s -X POST http://localhost:8080/api/job/job001/cancel \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## POST /api/job/{job_id}/replay
+
+Create a new job with the same type and parameters as an existing job.
+
+**Path parameters**
+
+<ParamField path="job_id" type="string" required>
+  The ID of the job to replay.
+</ParamField>
+
+**Response** — the newly created `Job` object.
+
+```bash
+curl -s -X POST http://localhost:8080/api/job/job001/replay \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## DELETE /api/job/{job_id}
+
+Delete a job record. Any running execution is stopped first.
+
+**Path parameters**
+
+<ParamField path="job_id" type="string" required>
+  The job's unique ID.
+</ParamField>
+
+**Response** — `true` on success.
+
+```bash
+curl -s -X DELETE http://localhost:8080/api/job/job001 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Creating jobs
+
+### POST /api/job/create/fetch-novel
+
+Fetch (or refresh) novel metadata from its source URL. Set `full` to `true` to also enqueue chapter content downloads.
+
+**Request body**
+
+<ParamField body="url" type="string" required>
+  The full URL of the novel's main page on the source site.
+</ParamField>
+
+<ParamField body="full" type="boolean" default="false">
+  When `true`, also fetches all chapter contents after the novel metadata is retrieved.
+</ParamField>
+
+**Response** — a `Job` object.
+
+```bash
+curl -s -X POST http://localhost:8080/api/job/create/fetch-novel \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://readnovelfull.com/overgeared.html", "full": false}'
+```
+
+### POST /api/job/create/fetch-volumes
+
+Queue a job to download chapter contents for one or more volumes.
+
+<Note>
+  Providing a single volume ID creates a `VOLUME` job. Multiple IDs create a `VOLUME_BATCH` job.
+</Note>
+
+**Request body**
+
+<ParamField body="volumes" type="string[]" required>
+  List of volume IDs whose chapter contents should be fetched. Must contain at least one ID.
+</ParamField>
+
+**Response** — a `Job` object.
+
+```bash
+curl -s -X POST http://localhost:8080/api/job/create/fetch-volumes \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"volumes": ["vol001", "vol002"]}'
+```
+
+### POST /api/job/create/fetch-chapters
+
+Queue a job to download content for specific chapters.
+
+<Note>
+  Providing a single chapter ID creates a `CHAPTER` job. Multiple IDs create a `CHAPTER_BATCH` job.
+</Note>
+
+**Request body**
+
+<ParamField body="chapters" type="string[]" required>
+  List of chapter IDs to fetch. Must contain at least one ID.
+</ParamField>
+
+**Response** — a `Job` object.
+
+```bash
+curl -s -X POST http://localhost:8080/api/job/create/fetch-chapters \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"chapters": ["ch001", "ch002", "ch003"]}'
+```
+
+### POST /api/job/create/fetch-images
+
+Queue a job to download images for specific chapter image records.
+
+**Request body**
+
+<ParamField body="images" type="string[]" required>
+  List of `ChapterImage` IDs to download. Must contain at least one ID.
+</ParamField>
+
+**Response** — a `Job` object.
+
+```bash
+curl -s -X POST http://localhost:8080/api/job/create/fetch-images \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"images": ["img001", "img002"]}'
+```
+
+### POST /api/job/create/make-artifacts
+
+Generate e-book artifacts for a novel in one or more output formats. The available formats depend on the user's tier.
+
+**Request body**
+
+<ParamField body="novel_id" type="string" required>
+  The ID of the novel to generate artifacts for.
+</ParamField>
+
+<ParamField body="formats" type="string[]" required>
+  List of output format strings. Supported values: `epub`, `json`, `txt`, `pdf`, `mobi`, `docx`, `rtf`, `fb2`, `azw3`, `lit`, `lrf`, `pdb`, `rb`, `tcr`.
+</ParamField>
+
+**Response** — a `Job` object (an `ARTIFACT_BATCH` job when multiple formats are requested).
+
+```bash
+curl -s -X POST http://localhost:8080/api/job/create/make-artifacts \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"novel_id": "abc123", "formats": ["epub", "mobi"]}'
+```
+
+---
+
+## Typical workflow
+
+```bash
+# 1. Create a fetch-novel job
+JOB_ID=$(curl -s -X POST http://localhost:8080/api/job/create/fetch-novel \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://readnovelfull.com/overgeared.html"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+# 2. Poll until done
+while true; do
+  STATUS=$(curl -s http://localhost:8080/api/job/$JOB_ID \
+    -H "Authorization: Bearer $TOKEN" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+  echo "Status: $STATUS"
+  [ "$STATUS" -ge 2 ] && break
+  sleep 2
+done
+
+# 3. Generate an EPUB artifact
+curl -s -X POST http://localhost:8080/api/job/create/make-artifacts \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"novel_id\": \"$NOVEL_ID\", \"formats\": [\"epub\"]}"
+```

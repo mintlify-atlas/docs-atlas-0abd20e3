@@ -1,0 +1,515 @@
+---
+title: "Crawler templates"
+description: "Ready-to-use base classes for common crawler patterns"
+---
+
+Templates are pre-built base classes that handle the boilerplate of `read_novel_info()` and `download_chapter_body()` for you. Instead of implementing the full crawl loop, you implement small, focused parsing methods and the template wires them together.
+
+All soup-based templates live in `lncrawl/templates/soup/`. For JavaScript-heavy sites there are matching browser templates in `lncrawl/templates/browser/`.
+
+<Tip>
+For most new sources, start with `GeneralSoupTemplate` (`_01_general_soup.py`). If the site has a search page, use `SearchableSoupTemplate` (`_02_searchable_soup.py`) instead.
+</Tip>
+
+## Soup templates
+
+<Tabs>
+  <Tab title="GeneralSoupTemplate">
+
+**Import:** `lncrawl.templates.soup.general`
+
+**When to use:** The default choice for any site that serves plain HTML. Handles the full novel info flow — title, cover, authors, genres, synopsis, chapter list — through small focused methods you implement.
+
+```python
+from lncrawl.templates.soup.general import GeneralSoupTemplate
+```
+
+### Required methods
+
+<ParamField path="parse_title(soup)" type="method" required>
+  Parse and return the novel title from the novel info page.
+
+  ```python
+  def parse_title(self, soup: PageSoup) -> str:
+      return soup.select_one("h1.novel-title").text.strip()
+  ```
+
+  - `soup` (`PageSoup`) — Result of `self.get_soup(self.novel_url)`.
+
+  Returns: `str`
+</ParamField>
+
+<ParamField path="parse_cover(soup)" type="method" required>
+  Parse and return the absolute URL of the novel cover image.
+
+  ```python
+  def parse_cover(self, soup: PageSoup) -> Optional[str]:
+      tag = soup.select_one(".cover img")
+      return self.absolute_url(tag["src"]) if tag else None
+  ```
+
+  - `soup` (`PageSoup`) — Result of `self.get_soup(self.novel_url)`.
+
+  Returns: `Optional[str]`
+</ParamField>
+
+<ParamField path="parse_chapter_list(soup)" type="method" required>
+  Yield `Chapter` and/or `Volume` objects that make up the table of contents. Chapters must have a 1-based `id`. Volumes are optional.
+
+  ```python
+  def parse_chapter_list(
+      self, soup: PageSoup
+  ) -> Generator[Union[Chapter, Volume], None, None]:
+      chap_id = 0
+      for a in soup.select(".chapter-list li a"):
+          chap_id += 1
+          yield Chapter(
+              id=chap_id,
+              title=a.text.strip(),
+              url=self.absolute_url(a["href"]),
+          )
+  ```
+
+  - `soup` (`PageSoup`) — Result of `self.get_soup(self.novel_url)`.
+
+  Returns: `Generator[Union[Chapter, Volume], None, None]`
+</ParamField>
+
+<ParamField path="select_chapter_body(soup)" type="method" required>
+  Return the single `PageSoup` tag that contains the chapter text. The template passes it to `parse_chapter_body()` which calls `self.cleaner.extract_contents()` to produce clean HTML.
+
+  ```python
+  def select_chapter_body(self, soup: PageSoup) -> PageSoup:
+      return soup.select_one("div.chapter-content")
+  ```
+
+  - `soup` (`PageSoup`) — Result of `self.get_soup(chapter.url)`.
+
+  Returns: `PageSoup`
+</ParamField>
+
+### Optional methods
+
+<ParamField path="parse_authors(soup)" type="method">
+  Yield author names. Default yields nothing.
+
+  ```python
+  def parse_authors(self, soup: PageSoup) -> Generator[str, None, None]:
+      for a in soup.select(".author-list a"):
+          yield a.text.strip()
+  ```
+
+  Returns: `Generator[str, None, None]`
+</ParamField>
+
+<ParamField path="parse_genres(soup)" type="method">
+  Yield genre/category names. Default yields nothing.
+
+  Returns: `Generator[str, None, None]`
+</ParamField>
+
+<ParamField path="parse_summary(soup)" type="method">
+  Return the novel synopsis as a string. Default returns `None`.
+
+  Returns: `Optional[str]`
+</ParamField>
+
+<ParamField path="get_novel_soup()" type="method">
+  Return the `PageSoup` for the novel info page. Default calls `self.get_soup(self.novel_url)`. Override when you need to navigate to a different page, handle pagination, or pass custom headers.
+
+  ```python
+  def get_novel_soup(self) -> PageSoup:
+      return self.get_soup(self.novel_url)
+  ```
+
+  Returns: `PageSoup`
+</ParamField>
+
+<ParamField path="parse_chapter_body(tag)" type="method">
+  Post-process the tag returned by `select_chapter_body()`. Default calls `self.cleaner.extract_contents(tag)`. Override if you need custom HTML extraction logic.
+
+  - `tag` (`PageSoup`) — The tag selected by `select_chapter_body()`.
+
+  Returns: `str`
+</ParamField>
+
+  </Tab>
+  <Tab title="SearchableSoupTemplate">
+
+**Import:** `lncrawl.templates.soup.searchable`
+
+**Extends:** `GeneralSoupTemplate`
+
+**When to use:** The site has a search endpoint. Adds two methods to the `GeneralSoupTemplate` contract that implement `search_novel()` automatically.
+
+```python
+from lncrawl.templates.soup.searchable import SearchableSoupTemplate
+```
+
+### Additional required methods
+
+Inherit all required methods from `GeneralSoupTemplate`, plus:
+
+<ParamField path="select_search_items(query)" type="method" required>
+  Fetch the search page and yield the raw tags, one per result. The template calls this and passes each tag to `parse_search_item()`.
+
+  ```python
+  def select_search_items(
+      self, query: str
+  ) -> Generator[PageSoup, None, None]:
+      params = {"keyword": query}
+      soup = self.get_soup(f"{self.home_url}search?{urlencode(params)}")
+      yield from soup.select(".search-results .novel-item a")
+  ```
+
+  - `query` (`str`) — The search string entered by the user.
+
+  Returns: `Generator[PageSoup, None, None]`
+</ParamField>
+
+<ParamField path="parse_search_item(tag)" type="method" required>
+  Parse a single search result tag and return a `SearchResult`.
+
+  ```python
+  def parse_search_item(self, tag: PageSoup) -> SearchResult:
+      return SearchResult(
+          title=tag.text.strip(),
+          url=self.absolute_url(tag["href"]),
+      )
+  ```
+
+  - `tag` (`PageSoup`) — A tag yielded by `select_search_items()`.
+
+  Returns: `SearchResult`
+</ParamField>
+
+<Note>
+The template automatically limits results to 10. Override `process_search_results()` if you need a different limit or additional filtering.
+</Note>
+
+  </Tab>
+  <Tab title="ChapterOnlySoupTemplate">
+
+**Import:** `lncrawl.templates.soup.chapter_only`
+
+**Extends:** `GeneralSoupTemplate`
+
+**When to use:** The site lists chapters without any volume grouping. Replaces `parse_chapter_list()` with two smaller methods — `select_chapter_tags()` and `parse_chapter_item()` — that only deal with individual chapters.
+
+```python
+from lncrawl.templates.soup.chapter_only import ChapterOnlySoupTemplate
+```
+
+### Required methods (replaces `parse_chapter_list`)
+
+<ParamField path="select_chapter_tags(soup)" type="method" required>
+  Yield the raw tag for each chapter entry on the TOC page.
+
+  ```python
+  def select_chapter_tags(
+      self, soup: PageSoup
+  ) -> Generator[PageSoup, None, None]:
+      yield from soup.select(".chapter-list li a")
+  ```
+
+  - `soup` (`PageSoup`) — The novel info page soup.
+
+  Returns: `Generator[PageSoup, None, None]`
+</ParamField>
+
+<ParamField path="parse_chapter_item(tag, id)" type="method" required>
+  Parse a single chapter tag and return a `Chapter`.
+
+  ```python
+  def parse_chapter_item(self, tag: PageSoup, id: int) -> Chapter:
+      return Chapter(
+          id=id,
+          title=tag.text.strip(),
+          url=self.absolute_url(tag["href"]),
+      )
+  ```
+
+  - `tag` (`PageSoup`) — A tag yielded by `select_chapter_tags()`.
+  - `id` (`int`) — Next available 1-based chapter index.
+
+  Returns: `Chapter`
+</ParamField>
+
+  </Tab>
+  <Tab title="ChapterWithVolumeSoupTemplate">
+
+**Import:** `lncrawl.templates.soup.with_volume`
+
+**Extends:** `GeneralSoupTemplate`
+
+**When to use:** The TOC page is organised into explicit volume sections, each containing a list of chapters. Handles the nested iteration for you.
+
+```python
+from lncrawl.templates.soup.with_volume import ChapterWithVolumeSoupTemplate
+```
+
+### Required methods (replaces `parse_chapter_list`)
+
+<ParamField path="select_volume_tags(soup)" type="method" required>
+  Yield one tag per volume section from the TOC page.
+
+  ```python
+  def select_volume_tags(
+      self, soup: PageSoup
+  ) -> Generator[PageSoup, None, None]:
+      yield from soup.select(".toc .volume-item")
+  ```
+
+  - `soup` (`PageSoup`) — The novel info page soup.
+
+  Returns: `Generator[PageSoup, None, None]`
+</ParamField>
+
+<ParamField path="select_chapter_tags(tag, vol, soup)" type="method" required>
+  Yield chapter tags found within a volume tag.
+
+  ```python
+  def select_chapter_tags(
+      self, tag: PageSoup, vol: Volume, soup: PageSoup
+  ) -> Generator[PageSoup, None, None]:
+      yield from tag.select(".chapter-item a")
+  ```
+
+  - `tag` (`PageSoup`) — The volume tag from `select_volume_tags()`.
+  - `vol` (`Volume`) — The parsed volume object.
+  - `soup` (`PageSoup`) — The full novel info page soup (for cross-reference).
+
+  Returns: `Generator[PageSoup, None, None]`
+</ParamField>
+
+### Optional methods
+
+<ParamField path="parse_volume_item(tag, id)" type="method">
+  Parse a volume tag and return a `Volume`. Default uses `tag.text` as the title.
+
+  ```python
+  def parse_volume_item(self, tag: PageSoup, id: int) -> Volume:
+      return Volume(id=id, title=tag.select_one(".vol-title").text.strip())
+  ```
+
+  - `tag` (`PageSoup`) — A tag from `select_volume_tags()`.
+  - `id` (`int`) — Next available 1-based volume index.
+
+  Returns: `Volume`
+</ParamField>
+
+<ParamField path="parse_chapter_item(tag, id, vol)" type="method">
+  Parse a chapter tag and return a `Chapter`. Default uses `tag.text` as the title and `tag["href"]` as the URL.
+
+  - `tag` (`PageSoup`) — A tag from `select_chapter_tags()`.
+  - `id` (`int`) — Next available 1-based chapter index.
+  - `vol` (`Volume`) — The parent volume.
+
+  Returns: `Chapter`
+</ParamField>
+
+  </Tab>
+  <Tab title="OptionalVolumeSoupTemplate">
+
+**Import:** `lncrawl.templates.soup.optional_volume`
+
+**Extends:** `GeneralSoupTemplate`
+
+**When to use:** The site sometimes groups chapters into volumes and sometimes does not. If `select_volume_tags()` yields nothing, the template falls back to a flat chapter list, auto-creating volumes every 100 chapters.
+
+```python
+from lncrawl.templates.soup.optional_volume import OptionalVolumeSoupTemplate
+```
+
+### Required methods
+
+<ParamField path="select_chapter_tags(parent)" type="method" required>
+  Yield chapter link tags from either a volume tag or the full page.
+
+  ```python
+  def select_chapter_tags(
+      self, parent: PageSoup
+  ) -> Generator[PageSoup, None, None]:
+      yield from parent.select(".chapter-item a")
+  ```
+
+  - `parent` (`PageSoup`) — Either a volume tag or the `html` element when no volumes are found.
+
+  Returns: `Generator[PageSoup, None, None]`
+</ParamField>
+
+<ParamField path="parse_chapter_item(tag, id, vol)" type="method" required>
+  Parse a chapter tag and return a `Chapter`.
+
+  - `tag` (`PageSoup`) — A chapter tag.
+  - `id` (`int`) — Next available 1-based chapter index.
+  - `vol` (`Volume`) — The current volume.
+
+  Returns: `Chapter`
+</ParamField>
+
+### Optional methods
+
+<ParamField path="select_volume_tags(soup)" type="method">
+  Yield volume tags if the site organises chapters into volumes. Default yields nothing, triggering flat-list fallback.
+
+  Returns: `Generator[PageSoup, None, None]`
+</ParamField>
+
+<ParamField path="parse_volume_item(tag, id)" type="method">
+  Parse a volume tag and return a `Volume`. Default returns `Volume(id=id)` with no title.
+
+  Returns: `Volume`
+</ParamField>
+
+  </Tab>
+</Tabs>
+
+## Named site templates
+
+Several popular site platforms have dedicated templates that implement all parsing logic. You only need to set `base_url` and any site-specific overrides.
+
+| Template class | Module | Platform |
+|---|---|---|
+| `MadaraTemplate` | `lncrawl.templates.madara` | WordPress sites using the Madara theme |
+| `NovelFullTemplate` | `lncrawl.templates.novelfull` | NovelFull-style sites |
+| `NovelPubTemplate` | `lncrawl.templates.novelpub` | NovelPub and clones |
+| `NovelMTLTemplate` | `lncrawl.templates.novelmtl` | NovelMTL and clones |
+| `MangaStreamTemplate` | `lncrawl.templates.mangastream` | MangaStream-style sites |
+
+```python
+from lncrawl.templates.novelfull import NovelFullTemplate
+
+class MyNovelFullSite(NovelFullTemplate):
+    base_url = ["https://mynovelfullclone.com/"]
+```
+
+<Note>
+Platform templates set `is_template = True` internally. Do not set this on your own crawler classes.
+</Note>
+
+## Complete example: GeneralSoupTemplate
+
+This example is based on `sources/_examples/_01_general_soup.py`.
+
+```python
+import logging
+from typing import Generator, Union
+
+from lncrawl.core import PageSoup
+from lncrawl.models import Chapter, Volume
+from lncrawl.templates.soup.general import GeneralSoupTemplate
+
+logger = logging.getLogger(__name__)
+
+
+class MyCrawler(GeneralSoupTemplate):
+    base_url = ["https://example.com/"]
+    has_manga = False
+    has_mtl = False
+
+    def initialize(self) -> None:
+        self.cleaner.bad_css.update([".ad-slot", ".donation-banner"])
+
+    def parse_title(self, soup: PageSoup) -> str:
+        return soup.select_one("h1.novel-title").text.strip()
+
+    def parse_cover(self, soup: PageSoup) -> str:
+        tag = soup.select_one(".cover-image img")
+        if not tag:
+            return ""
+        return self.absolute_url(tag.get("data-src") or tag["src"])
+
+    def parse_authors(self, soup: PageSoup) -> Generator[str, None, None]:
+        for a in soup.select(".author-list a"):
+            yield a.text.strip()
+
+    def parse_genres(self, soup: PageSoup) -> Generator[str, None, None]:
+        for a in soup.select(".genre-tags a"):
+            yield a.text.strip()
+
+    def parse_summary(self, soup: PageSoup) -> str:
+        return self.cleaner.extract_contents(soup.select_one(".synopsis"))
+
+    def parse_chapter_list(
+        self, soup: PageSoup
+    ) -> Generator[Union[Chapter, Volume], None, None]:
+        chap_id = 0
+        for a in soup.select(".chapter-list li a"):
+            chap_id += 1
+            yield Chapter(
+                id=chap_id,
+                title=a.text.strip(),
+                url=self.absolute_url(a["href"]),
+            )
+
+    def select_chapter_body(self, soup: PageSoup) -> PageSoup:
+        return soup.select_one("div.chapter-content")
+```
+
+## Complete example: SearchableSoupTemplate
+
+This example is based on `sources/_examples/_02_searchable_soup.py`.
+
+```python
+import logging
+from typing import Generator, Union
+from urllib.parse import urlencode
+
+from lncrawl.core import PageSoup
+from lncrawl.models import Chapter, SearchResult, Volume
+from lncrawl.templates.soup.searchable import SearchableSoupTemplate
+
+logger = logging.getLogger(__name__)
+
+
+class MyCrawler(SearchableSoupTemplate):
+    base_url = ["https://example.com/"]
+
+    def select_search_items(
+        self, query: str
+    ) -> Generator[PageSoup, None, None]:
+        params = {"searchkey": query}
+        soup = self.post_soup(f"{self.home_url}search?{urlencode(params)}")
+        yield from soup.select(".col-content .con .txt h3 a")
+
+    def parse_search_item(self, tag: PageSoup) -> SearchResult:
+        return SearchResult(
+            title=tag.get_text(strip=True),
+            url=self.absolute_url(tag["href"]),
+        )
+
+    def parse_title(self, soup: PageSoup) -> str:
+        return soup.select_one("h1.novel-title").text.strip()
+
+    def parse_cover(self, soup: PageSoup) -> str:
+        tag = soup.select_one(".cover img")
+        return self.absolute_url(tag["src"]) if tag else ""
+
+    def parse_chapter_list(
+        self, soup: PageSoup
+    ) -> Generator[Union[Chapter, Volume], None, None]:
+        chap_id = 0
+        for a in soup.select(".chapter-list li a"):
+            chap_id += 1
+            yield Chapter(
+                id=chap_id,
+                title=a.text.strip(),
+                url=self.absolute_url(a["href"]),
+            )
+
+    def select_chapter_body(self, soup: PageSoup) -> PageSoup:
+        return soup.select_one("div.chapter-text")
+```
+
+## Testing your crawler
+
+After writing your crawler, test it from the source:
+
+```bash
+# Download the first 3 chapters from a novel URL
+uv run python -m lncrawl -s "https://example.com/novel/my-novel" --first 3 -f
+
+# Verify your source appears in the registry
+uv run python -m lncrawl sources list | grep example.com
+```

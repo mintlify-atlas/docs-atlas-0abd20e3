@@ -1,0 +1,88 @@
+---
+title: "Introduction"
+description: "Lightnovel Crawler — download and convert light novels from 360+ sources"
+---
+
+Lightnovel Crawler (`lncrawl`) is an open-source tool that downloads light novels from online sources and converts them into ebook formats you can read offline. It supports **361 sources** and **391 crawlers** across multiple languages, and outputs to formats including EPUB, MOBI, PDF, DOCX, and more.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="360+ sources" icon="globe">
+    Crawl novels from 361 supported sources across English, Chinese, Japanese, Korean, Arabic, and many other languages.
+  </Card>
+  <Card title="Multiple output formats" icon="file-export">
+    Export to EPUB, MOBI, PDF, DOCX, RTF, FB2, AZW3, TXT, JSON, and more via native generation or Calibre conversion.
+  </Card>
+  <Card title="Three usage modes" icon="terminal">
+    Use the CLI for scripting, the web UI for a graphical interface, or Docker for portable deployment.
+  </Card>
+  <Card title="Search & discover" icon="magnifying-glass">
+    Search for novels by title across supported sources directly from the command line or web interface.
+  </Card>
+  <Card title="Flexible chapter selection" icon="list">
+    Download all chapters, a specific range, only the first N, or only the latest N chapters.
+  </Card>
+  <Card title="Bot support" icon="robot">
+    Use lncrawl through Discord and Telegram bots for a chat-based download experience.
+  </Card>
+</CardGroup>
+
+## Usage modes
+
+### CLI
+
+The `lncrawl` command-line interface is the primary way to interact with the tool. You can search for novels, crawl a URL, and output to any supported format — all from your terminal.
+
+```bash
+# Search for a novel
+lncrawl search "martial world"
+
+# Crawl a novel URL and download as EPUB
+lncrawl crawl https://example.com/novel/ --all -f epub
+```
+
+### Web server
+
+Run `lncrawl server` to start a local web application at `http://localhost:8080`. The web UI lets you search, queue downloads, and manage your novel library through a browser interface.
+
+```bash
+lncrawl server
+```
+
+Default login credentials: **username** `admin`, **password** `admin`.
+
+### Docker
+
+Docker is the easiest way to run lncrawl in an isolated environment or on a server.
+
+```bash
+docker pull ghcr.io/lncrawl/lightnovel-crawler
+docker tag ghcr.io/lncrawl/lightnovel-crawler lncrawl
+docker run -v ~/.lncrawl:/data --rm -it lncrawl
+```
+
+## Supported platforms
+
+Lightnovel Crawler runs on **Windows**, **macOS**, and **Linux**. It is available as:
+
+- A Python package via `pip` (all platforms)
+- A standalone binary (Windows, macOS, Linux)
+- A Docker image
+
+Python 3.9 or higher is required for the pip installation.
+
+## Discord and Telegram bots
+
+You can interact with lncrawl through community-hosted Discord and Telegram bots. These bots let you request novel downloads directly from a chat interface without installing anything locally.
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install lncrawl on your platform using pip, a standalone binary, or Docker.
+  </Card>
+  <Card title="Quickstart" icon="bolt" href="/quickstart">
+    Download your first novel in under 2 minutes.
+  </Card>
+</CardGroup>

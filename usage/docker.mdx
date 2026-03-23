@@ -1,0 +1,126 @@
+---
+title: "Docker"
+description: "Run Lightnovel Crawler in Docker for containerized deployment"
+---
+
+Docker is the recommended way to run Lightnovel Crawler in a reproducible, portable environment. The official image is published to GitHub Container Registry and includes Calibre, so all output formats work out of the box.
+
+## Quick setup
+
+<Steps>
+  <Step title="Pull the image">
+    ```bash
+    docker pull ghcr.io/lncrawl/lightnovel-crawler
+    ```
+  </Step>
+
+  <Step title="Tag it for convenience">
+    ```bash
+    docker tag ghcr.io/lncrawl/lightnovel-crawler lncrawl
+    ```
+  </Step>
+
+  <Step title="Create a data directory">
+    ```bash
+    mkdir -p ~/.lncrawl
+    ```
+
+    The container writes all data (database, downloaded novels, artifacts) to `/data`, which you map to this host directory via a volume mount.
+  </Step>
+
+  <Step title="Run lncrawl">
+    <CodeGroup>
+
+    ```bash Interactive (CLI)
+    docker run -v ~/.lncrawl:/data --rm -it lncrawl
+    ```
+
+    ```bash Web server
+    docker run -v ~/.lncrawl:/data -p 8080:8080 --rm -it lncrawl server
+    ```
+
+    ```bash Crawl a novel directly
+    docker run -v ~/.lncrawl:/data --rm -it lncrawl crawl --all -f epub https://novelfull.com/my-novel.html
+    ```
+
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Docker alias
+
+To avoid typing the full `docker run` command every time, add an alias to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.):
+
+```bash
+alias docker-lncrawl='docker run -v ~/.lncrawl:/data --rm -it -p 8080:8080 lncrawl'
+```
+
+Then use it like a local install:
+
+```bash
+docker-lncrawl server
+docker-lncrawl crawl --all -f epub https://novelfull.com/my-novel.html
+```
+
+## Volume mount
+
+The container reads and writes all persistent data through the `/data` path, set by the `LNCRAWL_DATA_PATH` environment variable.
+
+| Host path | Container path | Purpose |
+|---|---|---|
+| `~/.lncrawl` | `/data` | Database, novel files, artifacts, config |
+
+You can override the data path:
+
+```bash
+docker run -v /mnt/storage/lncrawl:/data -p 8080:8080 --rm -it lncrawl server
+```
+
+## Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `LNCRAWL_DATA_PATH` | `/data` | Path inside the container where all data is stored. |
+| `DATABASE_URL` | SQLite in `/data` | Override with a PostgreSQL URL for production use. |
+| `SELENIUM_GRID` | | URL to a Selenium Grid for JavaScript-heavy sites (e.g. `http://chrome:4444`). |
+| `PYTHONUNBUFFERED` | | Set to `1` to get real-time log output. |
+
+## Building from source
+
+If you want to build the image yourself:
+
+```bash
+# Build base image (Calibre + system deps) then application image
+make docker-build
+
+# Equivalent manual command (requires the base image to already exist)
+docker build -t lncrawl .
+```
+
+## Docker Compose
+
+The repository includes a local Docker Compose file at `scripts/local-compose.yml` that wires together the app server, a PostgreSQL database, and a Selenium Chrome node for JavaScript-heavy sites.
+
+```bash
+# Start the full stack in the background
+make docker-up
+# or: docker compose -f scripts/local-compose.yml up -d
+
+# Stop the stack
+make docker-down
+
+# Stream container logs
+make docker-logs
+```
+
+The compose stack exposes:
+
+| Service | Port | Description |
+|---|---|---|
+| `server` | `8080` | Lightnovel Crawler web server |
+| `postgres` | `5432` | PostgreSQL database |
+| `chrome` | `4444`, `7900` | Selenium Chrome node |
+
+<Note>
+  For production deployments, use `scripts/server-compose.yml` as a starting point. It references the published `ghcr.io/lncrawl/lightnovel-crawler:latest` image and omits the Chrome node by default.
+</Note>

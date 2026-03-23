@@ -1,0 +1,436 @@
+---
+title: "Crawler base class"
+description: "Reference for the Crawler base class used to implement source crawlers"
+---
+
+Every source in Lightnovel Crawler is a Python class that extends `Crawler`. The `Crawler` class provides HTTP utilities, HTML parsing, concurrency helpers, and the contract your implementation must fulfil.
+
+**Inheritance chain:** `Crawler` → `Scraper` → `TaskManager`
+
+**Source:** `lncrawl/core/crawler.py`
+
+## Class definition
+
+```python
+from lncrawl.core.crawler import Crawler
+
+class MyCrawler(Crawler):
+    base_url = ["https://example.com/"]
+```
+
+## Class-level attributes
+
+Declare these directly on the class body. They are read by the source service at import time.
+
+<ParamField path="base_url" type="Union[str, List[str]]" required>
+  One or more URLs that identify the site this crawler handles. The first entry becomes `self.home_url` at runtime. The source registry uses these to match an input URL to the correct crawler.
+
+  ```python
+  base_url = ["https://example.com/", "https://www.example.com/"]
+  ```
+</ParamField>
+
+<ParamField path="has_manga" type="bool" default="False">
+  Set to `True` if this source serves manga, manhua, or manhwa (image-based content rather than text).
+</ParamField>
+
+<ParamField path="has_mtl" type="bool" default="False">
+  Set to `True` if this source serves machine-translated content.
+</ParamField>
+
+<ParamField path="language" type="str" default='""'>
+  BCP-47 language code for the source language (e.g. `"en"`, `"zh"`, `"ja"`). Leave empty for multi-language sources.
+</ParamField>
+
+<ParamField path="is_disabled" type="bool" default="False">
+  When `True`, the source is excluded from normal use. Set this if a site has shut down or permanently broken.
+</ParamField>
+
+<ParamField path="disable_reason" type="Optional[str]" default="None">
+  Human-readable explanation of why the source is disabled. Only meaningful when `is_disabled` is `True`.
+</ParamField>
+
+## Instance attributes
+
+These attributes are initialized in `__init__` and are available throughout the crawler's lifetime. You must populate the required ones inside `read_novel_info()`.
+
+### Novel metadata
+
+| Attribute | Type | Description |
+|---|---|---|
+| `novel_url` | `str` | The current input URL. Available in `search_novel()` and `read_novel_info()`. |
+| `novel_title` | `str` | **Required.** The title of the novel. |
+| `novel_author` | `str` | Comma-separated list of author names. |
+| `novel_cover` | `Optional[str]` | Absolute URL to the cover image. |
+| `is_rtl` | `bool` | `True` for right-to-left text (e.g. Arabic, Hebrew). Default `False`. |
+| `novel_synopsis` | `str` | Synopsis or description of the novel. |
+| `novel_tags` | `List[str]` | Genre and tag names. |
+
+### Content lists
+
+| Attribute | Type | Description |
+|---|---|---|
+| `volumes` | `List[Volume]` | Ordered list of volumes. Can remain empty if the site has no volume grouping. |
+| `chapters` | `List[Chapter]` | **Required.** Ordered list of all chapters. |
+
+<Note>
+Both `volumes` and `chapters` must contain 1-based `id` values. The `chapters` list must be populated or the crawl will produce no output.
+</Note>
+
+## Abstract methods
+
+You must implement both of these in every crawler.
+
+### `read_novel_info()`
+
+```python
+def read_novel_info(self) -> None:
+    """Get novel title, author, cover, volumes and chapters"""
+```
+
+Called once before downloading begins. By the time this method returns you must have set at minimum `self.novel_title` and `self.chapters`.
+
+Typical implementation:
+
+```python
+def read_novel_info(self) -> None:
+    soup = self.get_soup(self.novel_url)
+
+    self.novel_title = soup.select_one("h1.title").text.strip()
+    self.novel_cover = self.absolute_url(soup.select_one(".cover img")["src"])
+
+    chap_id = 0
+    for a in soup.select(".chapter-list a"):
+        chap_id += 1
+        self.chapters.append(Chapter(
+            id=chap_id,
+            title=a.text.strip(),
+            url=self.absolute_url(a["href"]),
+        ))
+```
+
+### `download_chapter_body(chapter)`
+
+```python
+def download_chapter_body(self, chapter: Chapter) -> str:
+    """Download body of a single chapter and return as clean html format."""
+```
+
+Called once per chapter during the download phase. Must return valid HTML as a string. Use `self.cleaner.extract_contents(tag)` to strip ads and normalize markup.
+
+<ParamField path="chapter" type="Chapter" required>
+  The chapter to download. Use `chapter.url` to fetch the page.
+</ParamField>
+
+Returns: `str` — Clean HTML content of the chapter body.
+
+Typical implementation:
+
+```python
+def download_chapter_body(self, chapter: Chapter) -> str:
+    soup = self.get_soup(chapter.url)
+    body = soup.select_one("div.chapter-content")
+    return self.cleaner.extract_contents(body)
+```
+
+## Optional methods
+
+Override any of these to add capabilities or customise behaviour.
+
+### `initialize()`
+
+```python
+def initialize(self) -> None:
+    pass
+```
+
+Called once per session before any other method. Use it to configure `self.cleaner`, adjust headers, or set rate limits.
+
+```python
+def initialize(self) -> None:
+    self.cleaner.bad_tags.update(["aside", "figure"])
+    self.cleaner.bad_css.update([".ad-slot", ".donation-box"])
+```
+
+### `login(username_or_email, password_or_token)`
+
+```python
+def login(self, username_or_email: str, password_or_token: str) -> None:
+    pass
+```
+
+Called once before crawling when credentials are provided. Submit the login form or store an auth token for subsequent requests.
+
+<ParamField path="username_or_email" type="str" required>
+  Username, email address, or API key depending on the site.
+</ParamField>
+
+<ParamField path="password_or_token" type="str" required>
+  Password or authentication token.
+</ParamField>
+
+### `search_novel(query)`
+
+```python
+def search_novel(self, query: str) -> List[SearchResult]:
+    """Gets a list of results matching the given query"""
+    raise NotImplementedError()
+```
+
+Return up to ten `SearchResult` objects. Raise `NotImplementedError` (the default) if the site does not support search.
+
+<ParamField path="query" type="str" required>
+  The search string entered by the user.
+</ParamField>
+
+Returns: `List[SearchResult]`
+
+## Inherited from Scraper
+
+These methods are available on every `Crawler` instance. They handle HTTP, cookie management, and HTML parsing.
+
+### HTTP helpers
+
+<ParamField path="get_response(url, timeout, **kwargs)" type="method">
+  Fetch a URL with a GET request and return the raw `Response` object.
+
+  ```python
+  response = self.get_response("https://example.com/page")
+  ```
+
+  - `url` (`str`) — Target URL.
+  - `timeout` (`float | Tuple[float, float]`, default `(7, 301)`) — Connect and read timeouts in seconds.
+</ParamField>
+
+<ParamField path="get_soup(url, headers, encoding, **kwargs)" type="method">
+  Fetch a URL and return a `PageSoup` instance for HTML parsing.
+
+  ```python
+  soup = self.get_soup(self.novel_url)
+  title = soup.select_one("h1").text
+  ```
+
+  - `url` (`str`) — Target URL.
+  - `headers` (`MutableMapping`, optional) — Extra request headers.
+  - `encoding` (`str`, optional) — Force a specific character encoding.
+
+  Returns: `PageSoup`
+</ParamField>
+
+<ParamField path="get_json(url, headers, **kwargs)" type="method">
+  Fetch a URL and return the parsed JSON response.
+
+  ```python
+  data = self.get_json("https://example.com/api/novel/123")
+  ```
+
+  - `url` (`str`) — Target URL.
+  - `headers` (`MutableMapping`, optional) — Extra request headers.
+
+  Returns: `Any` (parsed JSON)
+</ParamField>
+
+<ParamField path="post_json(url, data, headers, **kwargs)" type="method">
+  POST to a URL and return the parsed JSON response.
+
+  ```python
+  data = self.post_json(
+      "https://example.com/api/chapters",
+      data={"novel_id": "42"},
+  )
+  ```
+
+  - `url` (`str`) — Target URL.
+  - `data` (`MutableMapping | str | bytes`, optional) — Request body.
+  - `headers` (`MutableMapping`, optional) — Extra request headers.
+
+  Returns: `Any` (parsed JSON)
+</ParamField>
+
+<ParamField path="post_soup(url, data, headers, encoding, **kwargs)" type="method">
+  POST to a URL and return a `PageSoup` of the response.
+
+  Returns: `PageSoup`
+</ParamField>
+
+<ParamField path="submit_form(url, data, multipart, headers, **kwargs)" type="method">
+  Submit a form and return the raw `Response`.
+
+  - `url` (`str`) — Form action URL.
+  - `data` (`MutableMapping | str | bytes`, optional) — Form fields.
+  - `multipart` (`bool`, default `False`) — Use `multipart/form-data` encoding.
+
+  Returns: `Response`
+</ParamField>
+
+### Utility helpers
+
+<ParamField path="absolute_url(url, page_url)" type="method">
+  Resolve a relative URL against the current page or `self.home_url`.
+
+  ```python
+  full = self.absolute_url("/chapter/1")          # -> "https://example.com/chapter/1"
+  full = self.absolute_url("../other", page_url)  # resolves relative to page_url
+  ```
+
+  - `url` (`Any`) — The URL to resolve.
+  - `page_url` (`str`, optional) — Base for relative resolution. Defaults to the last fetched soup URL.
+
+  Returns: `str`
+</ParamField>
+
+<ParamField path="make_soup(data, encoding)" type="method">
+  Create a `PageSoup` from an already-fetched response, bytes, or string without making a new network request.
+
+  Returns: `PageSoup`
+</ParamField>
+
+<ParamField path="set_header(key, value)" type="method">
+  Set a default header that is sent with every subsequent request.
+
+  ```python
+  self.set_header("X-Api-Key", "secret")
+  ```
+</ParamField>
+
+<ParamField path="set_cookie(name, value)" type="method">
+  Set a session cookie for subsequent requests.
+</ParamField>
+
+### Concurrency helpers (from TaskManager)
+
+<ParamField path="submit_task(fn, *args, **kwargs)" type="method">
+  Submit a callable to the thread pool and return a `Future`. Use this inside `read_novel_info()` or `download_chapter_body()` to parallelise requests.
+
+  ```python
+  futures = [
+      self.executor.submit(self.get_soup, chapter.url)
+      for chapter in self.chapters
+  ]
+  self.resolve_futures(futures, desc="Chapters", unit="ch")
+  ```
+
+  Returns: `Future[T]`
+</ParamField>
+
+<ParamField path="resolve_futures(futures, desc, unit, disable_bar, fail_fast)" type="method">
+  Wait for a list of `Future` objects to complete and return their results. Shows a progress bar by default.
+
+  - `futures` (`Iterable[Future]`) — Futures to wait on.
+  - `desc` (`str`, optional) — Progress bar label.
+  - `unit` (`str`, optional) — Progress bar unit name.
+  - `disable_bar` (`bool`, default `False`) — Suppress the progress bar.
+  - `fail_fast` (`bool`, default `False`) — Raise on the first error instead of continuing.
+
+  Returns: `List`
+</ParamField>
+
+## Data model classes
+
+Import these from `lncrawl.models`.
+
+### Chapter
+
+```python
+from lncrawl.models import Chapter
+
+chapter = Chapter(
+    id=1,
+    title="Chapter 1: The Beginning",
+    url="https://example.com/chapter/1",
+    volume=1,
+)
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `int` | **Required.** 1-based chapter index. |
+| `url` | `str` | URL where the chapter content is fetched from. |
+| `title` | `str` | Display title of the chapter. |
+| `volume` | `Optional[int]` | The `id` of the volume this chapter belongs to. |
+| `body` | `Optional[str]` | HTML content. Populated after `download_chapter_body()`. |
+| `images` | `Dict[str, str]` | Map of `image_id -> image_url` for inline images. |
+| `success` | `bool` | `True` once the chapter has been downloaded successfully. |
+
+### Volume
+
+```python
+from lncrawl.models import Volume
+
+volume = Volume(id=1, title="Volume I: Awakening")
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `int` | **Required.** 1-based volume index. |
+| `title` | `str` | Display title of the volume. |
+| `chapter_count` | `int` | Number of chapters. Computed automatically. |
+
+### SearchResult
+
+```python
+from lncrawl.models import SearchResult
+
+result = SearchResult(
+    title="The Legendary Hero",
+    url="https://example.com/novel/the-legendary-hero",
+    info="Chapters: 342 | Rating: 4.8",
+)
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `title` | `str` | **Required.** Novel title. |
+| `url` | `str` | **Required.** URL to the novel's table-of-contents page. |
+| `info` | `str` | Short metadata string shown in search results (e.g. chapter count, rating). |
+
+## TextCleaner
+
+Access via `self.cleaner`. Strips ads, normalises HTML, and returns clean paragraph-wrapped content.
+
+```python
+body_html = self.cleaner.extract_contents(tag)  # returns clean <p>...</p> HTML
+```
+
+Customise in `initialize()`:
+
+| Attribute | Type | Description |
+|---|---|---|
+| `bad_tags` | `Set[str]` | HTML tag names to remove entirely (e.g. `"aside"`, `"figure"`). |
+| `bad_css` | `Set[str]` | CSS selectors whose matching elements are removed (e.g. `".ads"`). |
+| `bad_text_regex` | `Set[str \| Pattern]` | Regex patterns — paragraphs matching any pattern are dropped. |
+| `substitutions` | `Dict[str, str]` | String replacements applied to text content. |
+
+## Minimal example
+
+```python
+import logging
+from lncrawl.core import Crawler
+from lncrawl.models import Chapter
+
+logger = logging.getLogger(__name__)
+
+
+class ExampleCrawler(Crawler):
+    base_url = ["https://example.com/"]
+
+    def read_novel_info(self) -> None:
+        soup = self.get_soup(self.novel_url)
+        self.novel_title = soup.select_one("h1.novel-title").text.strip()
+        self.novel_cover = self.absolute_url(
+            soup.select_one(".cover img")["src"]
+        )
+        chap_id = 0
+        for a in soup.select(".chapter-list li a"):
+            chap_id += 1
+            self.chapters.append(Chapter(
+                id=chap_id,
+                title=a.text.strip(),
+                url=self.absolute_url(a["href"]),
+            ))
+
+    def download_chapter_body(self, chapter: Chapter) -> str:
+        soup = self.get_soup(chapter.url)
+        body = soup.select_one("div.chapter-text")
+        return self.cleaner.extract_contents(body)
+```

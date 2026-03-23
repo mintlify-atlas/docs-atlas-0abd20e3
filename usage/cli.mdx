@@ -1,0 +1,332 @@
+---
+title: "CLI reference"
+description: "Complete reference for all lncrawl commands and options"
+---
+
+## Overview
+
+The `lncrawl` CLI is built with [Typer](https://typer.tiangolo.com/) and organized into subcommands. Running `lncrawl` with no arguments starts the web server on `127.0.0.1:8080`.
+
+```bash
+$ lncrawl -h
+Usage: lncrawl [OPTIONS] COMMAND [ARGS]...
+
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --verbose             -l            Log levels: -l = warn, -ll = info, -lll  │
+│                                     = debug                                  │
+│ --config              -c      PATH  Config file                              │
+│ --install-completion                Install completion for the current       │
+│                                     shell.                                   │
+│ --show-completion                   Show completion for the current shell,   │
+│                                     to copy it or customize the              │
+│                                     installation.                            │
+│ --help                -h            Show this message and exit.              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ version  Show current version.                                               │
+│ config   View and modify configuration settings.                             │
+│ sources  Manage sources.                                                     │
+│ crawl    Crawl from novel page URL.                                          │
+│ search   Search for novels by query string.                                  │
+│ server   Run web server.                                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+## Global options
+
+| Flag | Short | Description |
+|---|---|---|
+| `--verbose` | `-l` | Increase log verbosity. Use `-l` for warn, `-ll` for info, `-lll` for debug. |
+| `--config PATH` | `-c PATH` | Path to a config file to load instead of the default. |
+| `--install-completion` | | Install shell tab-completion for the current shell. |
+| `--show-completion` | | Print the shell completion script to stdout. |
+| `--help` | `-h` | Show the help message and exit. |
+
+---
+
+## crawl
+
+Download chapters from a novel page URL and export them to one or more formats.
+
+```bash
+lncrawl crawl [OPTIONS] [URL]
+```
+
+### Flags
+
+<AccordionGroup>
+  <Accordion title="crawl options">
+
+| Flag | Description |
+|---|---|
+| `--noin` | Disable interactive mode. Requires all options to be passed as flags. |
+| `--all` | Download all chapters. |
+| `--first N` | Download the first N chapters (N must be ≥ 1). |
+| `--last N` | Download the latest N chapters (N must be ≥ 1). |
+| `-f / --format FORMAT` | Output format. Can be repeated for multiple formats. See [Output formats](/usage/output-formats) for the full list. |
+| `--user TEXT` | Username or email for sources that require login. |
+| `--pass TEXT` | Password or token for sources that require login. |
+| `URL` | (Argument) Novel details page URL. |
+
+  </Accordion>
+</AccordionGroup>
+
+### Examples
+
+```bash
+# Interactive mode — prompts for URL, chapter range, and formats
+lncrawl crawl
+
+# Download all chapters as EPUB
+lncrawl crawl --all -f epub https://novelfull.com/my-novel.html
+
+# Download first 50 chapters as EPUB and MOBI
+lncrawl crawl --first 50 -f epub -f mobi https://novelfull.com/my-novel.html
+
+# Download latest 10 chapters, non-interactive
+lncrawl crawl --noin --last 10 -f epub https://novelfull.com/my-novel.html
+
+# Crawl a source that requires login
+lncrawl crawl --user me@example.com --pass secret -f epub https://some-site.com/novel
+```
+
+<Note>
+When `--noin` is set and no format is specified with `-f`, all available formats are produced.
+</Note>
+
+---
+
+## search
+
+Search for novels across all searchable sources.
+
+```bash
+lncrawl search [OPTIONS] [QUERY]
+```
+
+### Flags
+
+<AccordionGroup>
+  <Accordion title="search options">
+
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--source TEXT` | `-s` | | Filter which sources to search (matches against source URL). |
+| `--concurrency N` | `-c` | `15` | Maximum number of concurrent source searches (1–25). |
+| `--limit N` | `-l` | `10` | Maximum number of results to return (1–25). |
+| `--timeout SECONDS` | `-t` | `30` | Per-source timeout in seconds. |
+| `QUERY` | | | (Argument) Search query string. Must be at least 2 characters. |
+
+  </Accordion>
+</AccordionGroup>
+
+### Examples
+
+```bash
+# Interactive prompt for query
+lncrawl search
+
+# Search all sources
+lncrawl search "solo leveling"
+
+# Search only within novelfull sources
+lncrawl search "overlord" --source "novelfull"
+
+# Return up to 20 results with 10 concurrent searches
+lncrawl search "reincarnation" --limit 20 --concurrency 10
+```
+
+---
+
+## server
+
+Start the Lightnovel Crawler web server with a browser UI and REST API.
+
+```bash
+lncrawl server [OPTIONS]
+```
+
+### Flags
+
+<AccordionGroup>
+  <Accordion title="server options">
+
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--host TEXT` | `-h` | `0.0.0.0` | Host address to bind the server to. |
+| `--port INTEGER` | `-p` | `8080` | Port to listen on. |
+| `--watch` | `-w` | `False` | Run in watch/reload mode (auto-restarts on code changes). |
+| `--worker INTEGER` | `-n` | `1` | Number of worker processes (only used with `--watch`). |
+
+  </Accordion>
+</AccordionGroup>
+
+### Examples
+
+```bash
+# Start server on default port 8080
+lncrawl server
+
+# Start server with info-level logging on port 8080
+lncrawl -ll server -p 8080
+
+# Bind to localhost only
+lncrawl server --host 127.0.0.1 --port 9000
+
+# Watch mode (auto-reload)
+lncrawl server --watch
+```
+
+See [Web server](/usage/web-server) for full setup instructions.
+
+---
+
+## sources
+
+Manage and inspect crawler sources.
+
+```bash
+lncrawl sources COMMAND [ARGS]...
+```
+
+<AccordionGroup>
+  <Accordion title="sources list">
+
+List all available crawler sources.
+
+```bash
+lncrawl sources list [OPTIONS]
+```
+
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--query TEXT` | `-q` | | Filter sources by keyword in the URL. |
+| `--can-search` | `-s` | | Show only sources that support novel search. |
+| `--can-login` | `-l` | | Show only sources that support login. |
+| `--mtl` | `-b` | | Show only machine-translated sources. |
+| `--manga` | `-m` | | Show only manga/manhua sources. |
+| `--with-rejected` | | `False` | Include rejected or disabled sources. |
+| `--output-type TEXT` | `-o` | `table` | Output type: `table`, `json`, `yaml`, `csv`, or `text`. |
+
+```bash
+# List all sources as a table
+lncrawl sources list
+
+# Filter to searchable English sources
+lncrawl sources list --query en --can-search
+
+# Export full list as JSON
+lncrawl sources list -o json
+```
+
+  </Accordion>
+  <Accordion title="sources view">
+
+Inspect a single source crawler.
+
+```bash
+lncrawl sources view QUERY
+```
+
+The `QUERY` argument accepts a crawler name, URL, or file path.
+
+```bash
+lncrawl sources view novelfull
+lncrawl sources view https://novelfull.com
+```
+
+  </Accordion>
+  <Accordion title="sources create">
+
+Scaffold a new source crawler (optionally using OpenAI for auto-generation).
+
+```bash
+lncrawl sources create [OPTIONS] [URL]
+```
+
+| Flag | Short | Description |
+|---|---|---|
+| `--noin` | | Disable interactive mode. |
+| `--locale TEXT` | `-l` | Content language ISO 639-1 code (e.g. `en`, `zh`). |
+| `--features FEATURE` | `-f` | Crawler features to enable. Repeatable: `search`, `login`, `manga`, `mtl`, `volumes`. |
+| `--openai` | | Use OpenAI to auto-generate the crawler implementation. |
+| `--overwrite` | | Replace an existing crawler file. |
+| `URL` | | Target website URL. |
+
+```bash
+# Interactive scaffold
+lncrawl sources create
+
+# Non-interactive with OpenAI auto-generation
+lncrawl sources create --noin --locale en -f search --openai https://example.com
+```
+
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## config
+
+View and modify configuration settings.
+
+```bash
+lncrawl config COMMAND [ARGS]...
+```
+
+<AccordionGroup>
+  <Accordion title="config view">
+
+Display all configuration sections and values.
+
+```bash
+lncrawl config view [--format yaml|json]
+```
+
+```bash
+lncrawl config view
+lncrawl config view --format yaml
+lncrawl config view --format json
+```
+
+  </Accordion>
+  <Accordion title="config get">
+
+Read a single configuration value.
+
+```bash
+lncrawl config get [SECTION] [KEY]
+```
+
+```bash
+lncrawl config get app openai_api_key
+lncrawl config get crawler runner_concurrency
+```
+
+  </Accordion>
+  <Accordion title="config set">
+
+Write a configuration value.
+
+```bash
+lncrawl config set [SECTION] [KEY] [VALUE]
+```
+
+```bash
+lncrawl config set server base_url "https://example.com"
+lncrawl config set crawler runner_concurrency "10"
+lncrawl config set mail smtp_port "587"
+```
+
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## version
+
+Print the installed version and exit.
+
+```bash
+lncrawl version
+```

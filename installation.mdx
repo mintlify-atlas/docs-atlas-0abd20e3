@@ -1,0 +1,145 @@
+---
+title: "Installation"
+description: "Install Lightnovel Crawler on Windows, macOS, and Linux"
+---
+
+## Prerequisites
+
+- **Python 3.9 or higher** — required for the pip installation method. Install Python with pip enabled for [Windows](https://stackoverflow.com/a/44437176/1583052), [Linux](https://stackoverflow.com/a/51799221/1583052), or [macOS](https://itsevans.com/install-pip-osx/).
+- **Calibre** (optional but recommended) — lncrawl uses Calibre to convert ebooks to formats like MOBI, PDF, DOCX, and others. Without it, output is limited to EPUB, plain text, and JSON. Download Calibre from [calibre-ebook.com/download](https://calibre-ebook.com/download).
+
+<Note>
+  **macOS Calibre path:** After installing Calibre on macOS, you must add it to your PATH before running lncrawl:
+
+  ```bash
+  export PATH="$PATH:/Applications/calibre.app/Contents/MacOS"
+  ```
+
+  If you installed Calibre to a different folder, replace `/Applications/` with the correct path.
+</Note>
+
+## Installation methods
+
+<Tabs>
+  <Tab title="pip (recommended)">
+    Install the `lightnovel-crawler` package from PyPI:
+
+    ```bash
+    pip install -U lightnovel-crawler
+    ```
+
+    <Note>
+      In some environments you may need to use `pip3`, `python3 -m pip`, or `python -m pip` instead of `pip`.
+    </Note>
+
+    After installation, verify it works:
+
+    ```bash
+    lncrawl -h
+    ```
+
+    If `lncrawl` is not found, your pip scripts directory may not be in your PATH. You can run lncrawl using:
+
+    ```bash
+    python3 -m lncrawl -h
+    ```
+  </Tab>
+
+  <Tab title="Standalone binary">
+    Download a pre-built binary — no Python installation required.
+
+    <Steps>
+      <Step title="Download the binary for your platform">
+        - **Windows**: [lncrawl.exe](https://go.bitanon.dev/lncrawl-windows)
+        - **Linux**: [lncrawl](https://go.bitanon.dev/lncrawl-linux)
+        - **macOS**: [lncrawl](https://go.bitanon.dev/lncrawl-mac)
+
+        For older releases, visit the [GitHub Releases page](https://github.com/lncrawl/lightnovel-crawler/releases).
+      </Step>
+      <Step title="Make the binary executable (Linux/macOS)">
+        ```bash
+        chmod +x lncrawl
+        ```
+      </Step>
+      <Step title="Run the binary">
+        ```bash
+        ./lncrawl -h
+        ```
+      </Step>
+    </Steps>
+
+    <Warning>
+      On **Windows 8, 10, or later**, the OS may flag `lncrawl.exe` as unsafe to download or run. Bypass this security check to execute the program — it is a false positive from an unsigned executable.
+    </Warning>
+
+    <Note>
+      On **Linux** and **macOS**, installing via pip is recommended over the standalone binary.
+    </Note>
+  </Tab>
+
+  <Tab title="pip from GitHub">
+    Install directly from the GitHub repository to get code that has not yet been published to PyPI.
+
+    <CodeGroup>
+      ```bash master (stable)
+      pip install -U git+https://github.com/lncrawl/lightnovel-crawler.git#egg=lightnovel-crawler
+      ```
+
+      ```bash dev (cutting-edge)
+      pip install -U https://github.com/lncrawl/lightnovel-crawler/tarball/refs/heads/dev#egg=lightnovel-crawler
+      ```
+    </CodeGroup>
+
+    The `master` branch is the latest stable code. The `dev` branch contains in-progress changes that may be unstable.
+  </Tab>
+
+  <Tab title="Docker">
+    Docker runs lncrawl in an isolated container without touching your system Python.
+
+    <Steps>
+      <Step title="Pull and tag the image">
+        ```bash
+        docker pull ghcr.io/lncrawl/lightnovel-crawler
+        docker tag ghcr.io/lncrawl/lightnovel-crawler lncrawl
+        ```
+      </Step>
+      <Step title="Create a data directory">
+        ```bash
+        mkdir -p ~/.lncrawl
+        ```
+      </Step>
+      <Step title="Run the container">
+        ```bash
+        docker run -v ~/.lncrawl:/data --rm -it lncrawl
+        ```
+
+        For convenience, add an alias to your shell profile:
+
+        ```bash
+        alias docker-lncrawl='docker run -v ~/.lncrawl:/data --rm -it -p 8080:8080 lncrawl'
+        ```
+      </Step>
+      <Step title="Run the web server via Docker">
+        ```bash
+        docker-lncrawl server
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Verify the installation
+
+Run the following command to confirm lncrawl is installed and working:
+
+```bash
+lncrawl -h
+```
+
+You should see the lncrawl help output listing available commands (`crawl`, `search`, `server`, etc.).
+
+If the `lncrawl` command is not found, try:
+
+```bash
+python3 -m lncrawl -h
+```

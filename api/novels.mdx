@@ -1,0 +1,221 @@
+---
+title: "Novels API"
+description: "API endpoints for managing novels and the library"
+---
+
+The Novels API lets you browse the novel library, search for titles, inspect metadata, and remove novels. All endpoints are under `/api/novel` and require authentication.
+
+## GET /api/novel/novels
+
+Return a paginated list of novels in the library.
+
+**Query parameters**
+
+<ParamField query="search" type="string" default="">
+  Free-text search against novel titles.
+</ParamField>
+
+<ParamField query="domain" type="string" default="">
+  Filter by source domain (e.g. `royalroad.com`).
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of records to skip.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Maximum records to return. Cannot exceed `100`.
+</ParamField>
+
+**Response** — `Paginated[Novel]`
+
+<ResponseField name="total" type="integer">Total matching records.</ResponseField>
+<ResponseField name="offset" type="integer">Current offset.</ResponseField>
+<ResponseField name="limit" type="integer">Current limit.</ResponseField>
+<ResponseField name="items" type="Novel[]">
+  <Expandable title="Novel fields">
+    <ResponseField name="id" type="string">Unique novel ID.</ResponseField>
+    <ResponseField name="domain" type="string">Domain name of the source website.</ResponseField>
+    <ResponseField name="url" type="string">Full URL of the novel's main page.</ResponseField>
+    <ResponseField name="title" type="string">Title of the novel.</ResponseField>
+    <ResponseField name="authors" type="string | null">Comma-separated list of authors.</ResponseField>
+    <ResponseField name="synopsis" type="string | null">Brief synopsis or description.</ResponseField>
+    <ResponseField name="tags" type="string[]">Genre or thematic tags.</ResponseField>
+    <ResponseField name="cover_url" type="string | null">Remote cover image URL.</ResponseField>
+    <ResponseField name="cover_file" type="string">Relative path to the locally cached cover image.</ResponseField>
+    <ResponseField name="cover_available" type="boolean">Whether the local cover image exists.</ResponseField>
+    <ResponseField name="mtl" type="boolean">True if the content is machine-translated.</ResponseField>
+    <ResponseField name="rtl" type="boolean">True if the text is right-to-left.</ResponseField>
+    <ResponseField name="manga" type="boolean">True if this entry is a manga/manhua/comic.</ResponseField>
+    <ResponseField name="language" type="string | null">ISO 639-1 two-letter language code.</ResponseField>
+    <ResponseField name="volume_count" type="integer">Number of available volumes.</ResponseField>
+    <ResponseField name="chapter_count" type="integer">Number of available chapters.</ResponseField>
+    <ResponseField name="created_at" type="integer">Creation time (UNIX ms).</ResponseField>
+    <ResponseField name="updated_at" type="integer">Last update time (UNIX ms).</ResponseField>
+  </Expandable>
+</ResponseField>
+
+```bash
+curl -s "http://localhost:8080/api/novel/novels?search=overgeared&limit=5" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```json
+{
+  "total": 1,
+  "offset": 0,
+  "limit": 5,
+  "items": [
+    {
+      "id": "abc123",
+      "domain": "readnovelfull.com",
+      "url": "https://readnovelfull.com/overgeared.html",
+      "title": "Overgeared",
+      "authors": "Park Saenal",
+      "synopsis": "Satisfy's top ranker...",
+      "tags": ["action", "fantasy"],
+      "cover_url": "https://readnovelfull.com/cover.jpg",
+      "cover_file": "novels/abc123/cover.jpg",
+      "cover_available": true,
+      "mtl": false,
+      "rtl": false,
+      "manga": false,
+      "language": "en",
+      "volume_count": 22,
+      "chapter_count": 1753,
+      "created_at": 1700000000000,
+      "updated_at": 1700001000000
+    }
+  ]
+}
+```
+
+## GET /api/novel/sources
+
+Return a list of all source domains that have at least one novel in the library. Useful for populating a domain filter.
+
+**Response** — array of `SourceItem` objects.
+
+<ResponseField name="url" type="string">Source base URL.</ResponseField>
+<ResponseField name="domain" type="string">Domain name.</ResponseField>
+<ResponseField name="version" type="integer">Crawler version number.</ResponseField>
+<ResponseField name="has_manga" type="boolean">Whether the source has manga.</ResponseField>
+<ResponseField name="has_mtl" type="boolean">Whether the source provides machine-translated content.</ResponseField>
+<ResponseField name="language" type="string">Two-letter language code.</ResponseField>
+<ResponseField name="is_disabled" type="boolean">Whether the source is currently disabled.</ResponseField>
+<ResponseField name="disable_reason" type="string | null">Reason the source is disabled, if applicable.</ResponseField>
+<ResponseField name="can_search" type="boolean">Whether the source supports novel search.</ResponseField>
+<ResponseField name="can_login" type="boolean">Whether the source supports user login.</ResponseField>
+<ResponseField name="total_novels" type="integer">Number of novels from this source in the library.</ResponseField>
+
+```bash
+curl -s http://localhost:8080/api/novel/sources \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## GET /api/novel/{novel_id}
+
+Return a single novel by its ID.
+
+**Path parameters**
+
+<ParamField path="novel_id" type="string" required>
+  The novel's unique ID.
+</ParamField>
+
+**Response** — a `Novel` object (same fields as in the list response).
+
+```bash
+curl -s http://localhost:8080/api/novel/abc123 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## GET /api/novel/{novel_id}/volumes
+
+Return all volumes for a novel.
+
+**Path parameters**
+
+<ParamField path="novel_id" type="string" required>
+  The novel's unique ID.
+</ParamField>
+
+**Response** — array of `Volume` objects.
+
+<ResponseField name="id" type="string">Unique volume ID.</ResponseField>
+<ResponseField name="novel_id" type="string">Parent novel ID.</ResponseField>
+<ResponseField name="serial" type="integer">Volume number (1-indexed).</ResponseField>
+<ResponseField name="title" type="string">Volume title.</ResponseField>
+<ResponseField name="chapter_count" type="integer">Number of chapters in this volume.</ResponseField>
+<ResponseField name="created_at" type="integer">Creation time (UNIX ms).</ResponseField>
+<ResponseField name="updated_at" type="integer">Last update time (UNIX ms).</ResponseField>
+
+```bash
+curl -s http://localhost:8080/api/novel/abc123/volumes \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## GET /api/novel/{novel_id}/chapters
+
+Return a paginated list of chapters for a novel.
+
+**Path parameters**
+
+<ParamField path="novel_id" type="string" required>
+  The novel's unique ID.
+</ParamField>
+
+**Query parameters**
+
+<ParamField query="offset" type="integer" default="0">
+  Number of records to skip.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Maximum records to return. Cannot exceed `100`.
+</ParamField>
+
+**Response** — `Paginated[Chapter]` (see [Chapters API](/api/chapters) for chapter field descriptions).
+
+```bash
+curl -s "http://localhost:8080/api/novel/abc123/chapters?limit=50" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## GET /api/novel/{novel_id}/artifacts
+
+Return the latest artifacts (generated e-book files) for a novel.
+
+**Path parameters**
+
+<ParamField path="novel_id" type="string" required>
+  The novel's unique ID.
+</ParamField>
+
+**Response** — array of `Artifact` objects (see [Artifacts API](/api/artifacts) for field descriptions).
+
+```bash
+curl -s http://localhost:8080/api/novel/abc123/artifacts \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## DELETE /api/novel/{novel_id}
+
+Permanently remove a novel and all its associated data from the library.
+
+<Warning>
+  This action is irreversible and deletes all chapters, volumes, and artifacts for the novel. Requires **admin** privileges.
+</Warning>
+
+**Path parameters**
+
+<ParamField path="novel_id" type="string" required>
+  The novel's unique ID.
+</ParamField>
+
+**Response** — `true` on success.
+
+```bash
+curl -s -X DELETE http://localhost:8080/api/novel/abc123 \
+  -H "Authorization: Bearer $TOKEN"
+```

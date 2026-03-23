@@ -1,0 +1,136 @@
+---
+title: "Sources overview"
+description: "Understanding how Lightnovel Crawler sources work"
+---
+
+A **source** is a crawler that knows how to scrape a specific website. Each source is a Python module that understands a site's structure: how to find the novel title and cover, how to list chapters, and how to extract chapter text. When you give `lncrawl` a URL, it looks up the matching source and uses it to download content from that site.
+
+## Source organization
+
+Sources live in the `sources/` directory and are organized by language code. English sources are further split alphabetically into subdirectories.
+
+<CardGroup cols={3}>
+  <Card title="en/ — English" icon="flag">
+    The largest group. Hundreds of English-language light novel and manga sites, organized alphabetically (`a/`, `b/`, `c/`, …).
+  </Card>
+  <Card title="zh/ — Chinese" icon="flag">
+    Chinese-language novel sites (simplified and traditional).
+  </Card>
+  <Card title="ja/ — Japanese" icon="flag">
+    Japanese sources, including Syosetu and related platforms.
+  </Card>
+  <Card title="ar/ — Arabic" icon="flag">
+    Arabic novel sites such as arnovel.me and kolnovel.com.
+  </Card>
+  <Card title="es/ — Spanish" icon="flag">
+    Spanish-language novel sites.
+  </Card>
+  <Card title="fr/ — French" icon="flag">
+    French-language novel sites.
+  </Card>
+  <Card title="id/ — Indonesian" icon="flag">
+    Indonesian novel sites.
+  </Card>
+  <Card title="pt/ — Portuguese" icon="flag">
+    Portuguese-language novel sites.
+  </Card>
+  <Card title="ru/ — Russian" icon="flag">
+    Russian-language novel sites.
+  </Card>
+  <Card title="tr/ — Turkish" icon="flag">
+    Turkish novel sites.
+  </Card>
+  <Card title="vi/ — Vietnamese" icon="flag">
+    Vietnamese novel sites.
+  </Card>
+  <Card title="multi/ — Multi-language" icon="globe">
+    Sites that serve content in multiple languages (e.g., mtlnovels.com, foxaholic.com, wattpad.com).
+  </Card>
+</CardGroup>
+
+## Source metadata fields
+
+Every crawler class defines a set of metadata attributes. These are read by the source service to index and filter sources.
+
+| Field | Type | Description |
+|---|---|---|
+| `base_url` | `str \| list[str]` | One or more URLs that this crawler handles |
+| `language` | `str` | BCP-47 language code (e.g., `"en"`, `"zh"`) |
+| `has_manga` | `bool` | `True` if the site serves manga, manhua, or manhwa |
+| `has_mtl` | `bool` | `True` if the site serves machine-translated content |
+| `version` | `int` | Monotonically increasing version number (bumped on each edit) |
+
+Additional flags are derived at runtime:
+
+| Flag | Meaning |
+|---|---|
+| `can_search` | The crawler implements `search_novel()` |
+| `can_login` | The crawler implements `login()` |
+| `is_disabled` | The source's domain appears in the rejected list |
+
+## Feature icons
+
+The README and web UI use icons to indicate source capabilities at a glance:
+
+| Icon | Meaning |
+|---|---|
+| 🤖 | Contains machine-translated (MTL) content |
+| 🔍 | Supports searching for novels by keyword |
+| 🔑 | Requires a login / account to access content |
+| 🖼️ | Serves manga, manhua, or manhwa (image-based content) |
+
+## Managing sources
+
+The `lncrawl sources` command is the entry point for all source-related tasks.
+
+```text
+$ lncrawl sources --help
+```
+
+### List available sources
+
+Print every supported source URL to stdout:
+
+```bash
+lncrawl sources list
+```
+
+### Search for a source
+
+Filter by domain name or keyword:
+
+```bash
+# Check whether a specific domain is supported
+lncrawl sources list | grep "novelbin.com"
+
+# Search by keyword using the built-in search
+lncrawl sources list | grep "wuxia"
+```
+
+### Create a new source with AI assistance
+
+Generate a crawler scaffold using ChatGPT:
+
+```bash
+lncrawl sources create
+```
+
+<Tip>
+To add a source manually, copy `sources/_examples/_01_general_soup.py` into the correct `sources/{lang}/` folder and implement `parse_title`, `parse_cover`, `parse_chapter_list`, and `select_chapter_body`. See the [contributor guide](https://github.com/lncrawl/lightnovel-crawler/blob/master/.github/docs/CREATING_CRAWLERS.md) for the full walkthrough.
+</Tip>
+
+## Source discovery mechanism
+
+Sources are **auto-discovered at startup**. The `Sources` service (in `lncrawl/services/sources/service.py`) scans all `*.py` files under the configured source directories and imports them with a thread pool. Any class that extends `Crawler` and sets a `base_url` is automatically registered.
+
+The discovery order is:
+
+1. **Bundled sources** — the `sources/` directory shipped with the package (loaded from the compiled `_index.json`)
+2. **User sources** — a user-configured directory for private or custom crawlers
+3. **Remote updates** — an optional background sync that downloads the latest source index from GitHub
+
+Each source is indexed by host name so URL lookups are O(1). A full-text search (FTS) index is also built over file names, class names, and URLs to support keyword queries.
+
+<Note>
+Sources are loaded lazily — the source service does not block startup. If you call `lncrawl sources list` immediately after launch the list will be populated asynchronously.
+</Note>

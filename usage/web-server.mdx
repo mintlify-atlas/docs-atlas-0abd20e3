@@ -1,0 +1,105 @@
+---
+title: "Web server"
+description: "Run Lightnovel Crawler as a web server with browser UI and REST API"
+---
+
+Lightnovel Crawler ships a self-hosted web server that provides a browser UI for managing your novel library and a REST API for integrations.
+
+## Starting the server
+
+<Steps>
+  <Step title="Install Lightnovel Crawler">
+    Make sure `lncrawl` is installed. See the [Quickstart](/quickstart) guide for installation options.
+  </Step>
+
+  <Step title="Start the server">
+    Run the `server` subcommand:
+
+    ```bash
+    lncrawl server
+    ```
+
+    The server starts on `0.0.0.0:8080` by default. To enable info-level logging and specify a port explicitly:
+
+    ```bash
+    lncrawl -ll server -p 8080
+    ```
+  </Step>
+
+  <Step title="Open the browser UI">
+    Navigate to [http://localhost:8080](http://localhost:8080) in your browser.
+  </Step>
+
+  <Step title="Log in">
+    Use the default credentials:
+
+    | Field | Value |
+    |---|---|
+    | Username | `admin` |
+    | Password | `admin` |
+  </Step>
+</Steps>
+
+<Note>
+  Change the default password after your first login. The default credentials are well-known and should not be used on any network-accessible server.
+</Note>
+
+## Server options
+
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--host TEXT` | `-h` | `0.0.0.0` | Host address to bind to. Use `127.0.0.1` to restrict to localhost. |
+| `--port INTEGER` | `-p` | `8080` | Port to listen on. |
+| `--watch` | `-w` | `False` | Enable auto-reload on code changes (development use). |
+| `--worker INTEGER` | `-n` | `1` | Number of worker processes (only applies in watch mode). |
+
+## What the web UI provides
+
+- **Library management** — add novels to your library, browse metadata, and track reading progress.
+- **Crawling jobs** — submit download jobs for individual novels or chapters and monitor their status in the job queue.
+- **Artifact downloads** — download generated e-books in any supported format directly from the browser.
+- **Source browsing** — explore and search across all supported crawler sources.
+- **Configuration** — adjust server and crawler settings through the UI.
+
+## REST API
+
+The REST API is available at:
+
+```
+http://localhost:8080/api
+```
+
+Authentication uses the same credentials as the web UI. Endpoints are organized around the following resources:
+
+| Path prefix | Description |
+|---|---|
+| `/api/novels` | Novel library management |
+| `/api/chapters` | Chapter data |
+| `/api/volumes` | Volume groupings |
+| `/api/jobs` | Background job queue |
+| `/api/artifacts` | Generated e-book files |
+| `/api/auth` | Authentication tokens |
+
+## Port configuration
+
+To run on a different port:
+
+```bash
+lncrawl server -p 9000
+```
+
+To expose only on localhost (useful when proxying through Nginx or Caddy):
+
+```bash
+lncrawl server --host 127.0.0.1 --port 8080
+```
+
+## Running in Docker
+
+For persistent, production-style deployments use Docker. See the [Docker](/usage/docker) page for full instructions, including a Docker Compose setup with PostgreSQL.
+
+```bash
+docker run -v ~/.lncrawl:/data -p 8080:8080 --rm -it lncrawl server
+```
+
+The `LNCRAWL_DATA_PATH` environment variable controls where the container stores its data (`/data` by default).
