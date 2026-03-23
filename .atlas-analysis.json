@@ -1,0 +1,106 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Lightnovel Crawler",
+  "projectDescription": "A CLI and web-based tool to crawl, download, and convert light novels from 360+ online sources into e-book formats like EPUB, MOBI, PDF, and more.",
+  "theme": "palm",
+  "primaryColor": "#048e7f",
+  "lightColor": "#64a8a4",
+  "darkColor": "#d0d7d6",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Usage",
+            "pages": [
+              "usage/cli",
+              "usage/web-server",
+              "usage/docker",
+              "usage/output-formats"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/environment-variables"
+            ]
+          },
+          {
+            "group": "Sources",
+            "pages": [
+              "sources/overview",
+              "sources/supported-sources"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "contributing/overview",
+              "contributing/creating-crawlers",
+              "contributing/development-setup"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "REST API",
+            "pages": [
+              "api/overview",
+              "api/auth",
+              "api/novels",
+              "api/chapters",
+              "api/jobs",
+              "api/artifacts"
+            ]
+          },
+          {
+            "group": "Crawler API",
+            "pages": [
+              "api/crawler-base",
+              "api/templates"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Download light novels from 360+ supported online sources across multiple languages",
+    "Export to multiple e-book formats: EPUB, MOBI, PDF, DOCX, RTF, FB2, AZW3, and more",
+    "Interactive CLI with terminal prompts and non-interactive batch mode",
+    "Web server UI with REST API for remote access and browser-based management",
+    "Bot integrations for Discord and Telegram",
+    "Cloudflare bypass and browser automation for JS-heavy sites",
+    "Concurrent chapter downloading with configurable worker threads",
+    "Search novels across supported sources by query string",
+    "Docker support for containerized deployment"
+  ],
+  "publicApiSurface": [
+    "lncrawl crawl [URL] - Download chapters from a novel URL",
+    "lncrawl search [QUERY] - Search for novels by keyword",
+    "lncrawl server - Start the web server (default port 8080)",
+    "lncrawl sources - Manage and list available sources",
+    "lncrawl config - View and modify configuration settings",
+    "lncrawl version - Show current version",
+    "Crawler.read_novel_info() - Abstract method to fetch novel metadata",
+    "Crawler.download_chapter_body() - Abstract method to fetch chapter content",
+    "Crawler.search_novel() - Optional method for search support",
+    "Crawler.login() - Optional method for authenticated sources",
+    "GeneralSoupTemplate - Base class for BeautifulSoup-based crawlers",
+    "SearchableSoupTemplate - Base class for searchable crawlers",
+    "REST API: GET/POST /api/novels, /api/jobs, /api/chapters, /api/artifacts"
+  ]
+}
